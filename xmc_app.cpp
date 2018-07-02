@@ -171,9 +171,9 @@ class stateCheckXpNetAddress : public xmcApp
             break;
         case pushedNormal:
         case pushedlong:
-            /* Store selected address. */
+            /* Store selected address and reset to activate new address. */
             m_LocStorage.XpNetAddressSet(m_XpNetAddress);
-            transit<stateInitXpNet>();
+            nvic_sys_reset();
             break;
         case pushedShort: break;
         }
@@ -859,6 +859,10 @@ class mainMenu : public xmcApp
             transit<stateGetPowerStatus>();
             break;
         case button_0:
+            // Set invalid XpNet device address and go to Xp address menu.
+            m_LocStorage.XpNetAddressSet(255);
+            transit<stateCheckXpNetAddress>();
+            break;
         case button_none: break;
         }
     };
