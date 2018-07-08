@@ -36,7 +36,7 @@ WmcTft::locoInfo xmcApp::locInfoActual;
 WmcTft::locoInfo xmcApp::locInfoPrevious;
 locData xmcApp::m_LocDataRecievedPrevious;
 uint8_t xmcApp::m_locFunctionAssignment[5];
-bool xmcApp::m_PowerStatus                 = false;
+xmcApp::powerStatus xmcApp::m_PowerStatus  = off;
 bool xmcApp::m_LocSelection                = false;
 uint8_t xmcApp::m_XpNetAddress             = 0;
 uint8_t xmcApp::m_ConnectCount             = 0;
@@ -63,15 +63,16 @@ class stateGetPowerStatus;
 class stateGetLocData;
 class statePowerOff;
 class statePowerOn;
-class turnoutControl;
-class turnoutControlPowerOff;
-class mainMenu;
-class menuLocAdd;
-class menuLocFunctionsAdd;
-class menuLocFunctionsChange;
-class menuLocDelete;
-class commandLineInterfaceActive;
-class cvProgramming;
+class statePowerEmergencyStop;
+class stateTurnoutControl;
+class stateTurnoutControlPowerOff;
+class stateMainMenu;
+class stateMenuLocAdd;
+class stateMenuLocFunctionsAdd;
+class stateMenuLocFunctionsChange;
+class stateMenuLocDelete;
+class stateCommandLineInterfaceActive;
+class stateCvProgramming;
 
 /***********************************************************************************************************************
  * Init the application and show start screen 3 seconds.
@@ -248,14 +249,17 @@ class stateGetPowerStatus : public xmcApp
         {
         case none:
         case powerOn:
-            m_PowerStatus = true;
+            m_PowerStatus = powerStatus::on;
             transit<stateGetLocData>();
             break;
         case powerOff:
-            m_PowerStatus = false;
+            m_PowerStatus = powerStatus::off;
             transit<stateGetLocData>();
             break;
         case powerStop:
+            m_PowerStatus = powerStatus::emergency;
+            transit<stateGetLocData>();
+            break;
         case programmingMode:
         case locdata: break;
         }
@@ -303,15 +307,12 @@ class stateGetLocData : public xmcApp
             m_xmcTft.Clear();
             updateLocInfoOnScreen(true);
 
-            if (m_PowerStatus == false)
+            switch (m_PowerStatus)
             {
-                transit<statePowerOff>();
+            case powerStatus::off: transit<statePowerOff>(); break;
+            case powerStatus::on: transit<statePowerOn>(); break;
+            case powerStatus::emergency: transit<statePowerEmergencyStop>(); break;
             }
-            else
-            {
-                transit<statePowerOn>();
-            }
-            break;
         }
     }
 };
@@ -325,7 +326,7 @@ class statePowerOff : public xmcApp
      */
     void entry() override
     {
-        m_PowerStatus = false;
+        m_PowerStatus = powerStatus::off;
         m_xmcTft.UpdateStatus("POWER OFF", false, WmcTft::color_red);
         m_xmcTft.UpdateSelectedAndNumberOfLocs(m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
     }
@@ -358,7 +359,8 @@ class statePowerOff : public xmcApp
         case none:
         case powerOn: transit<statePowerOn>(); break;
         case powerOff:
-        case powerStop:
+
+        case powerStop: break;
         case locdata:
             LocDataPtr = (locData*)(e.Data);
             memcpy(&m_LocDataReceived, LocDataPtr, sizeof(locData));
@@ -392,7 +394,7 @@ class statePowerOff : public xmcApp
             /* Power on request. */
             m_XpNet.setPower(csNormal);
             break;
-        case pushedlong: transit<mainMenu>(); break;
+        case pushedlong: transit<stateMainMenu>(); break;
         default: break;
         }
     }
@@ -425,7 +427,7 @@ class statePowerOn : public xmcApp
      */
     void entry() override
     {
-        m_PowerStatus = true;
+        m_PowerStatus = powerStatus::on;
         m_xmcTft.UpdateStatus("POWER ON ", false, WmcTft::color_green);
         m_xmcTft.UpdateSelectedAndNumberOfLocs(m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
     }
@@ -441,29 +443,13 @@ class statePowerOn : public xmcApp
         case none:
         case powerOn: break;
         case powerOff: transit<statePowerOff>(); break;
-        case powerStop:
+        case powerStop: transit<statePowerEmergencyStop>(); break;
         case locdata:
             LocDataPtr = (locData*)(e.Data);
             memcpy(&m_LocDataReceived, LocDataPtr, sizeof(locData));
             updateLocInfoOnScreen(false);
             break;
         case programmingMode: break;
-        }
-    }
-
-    /**
-     * Get loc info.
-     */
-    void react(updateEvent500msec const&) override
-    {
-        if (m_SkipRequestCnt > 0)
-        {
-            m_SkipRequestCnt--;
-        }
-        else
-        {
-            m_XpNet.getLocoInfo(
-                (uint8_t)(m_LocLib.GetActualLocAddress() >> 8), (uint8_t)(m_LocLib.GetActualLocAddress()));
         }
     }
 
@@ -551,8 +537,82 @@ class statePowerOn : public xmcApp
         case button_5:
             /* To turnout control. */
             m_xmcTft.Clear();
-            transit<turnoutControl>();
+            transit<stateTurnoutControl>();
             break;
+        default: break;
+        }
+    };
+};
+
+/***********************************************************************************************************************
+ * Emergency stop state, no speed control allowed, functions allowed.
+ */
+class statePowerEmergencyStop : public xmcApp
+{
+    /**
+     * Show turnout screen.
+     */
+    void entry() override
+    {
+        m_PowerStatus = powerStatus::emergency;
+        m_xmcTft.UpdateStatus("POWER ON ", true, WmcTft::color_yellow);
+        m_xmcTft.UpdateSelectedAndNumberOfLocs(m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
+
+        /* Stop loc. */
+        m_LocLib.SpeedSet(0);
+    };
+
+    /**
+     * Handle the response.
+     */
+    void react(XpNetEvent const& e) override
+    {
+        locData* LocDataPtr = NULL;
+        switch (e.dataType)
+        {
+        case none:
+        case powerOn: transit<statePowerOn>(); break;
+        case powerOff: transit<statePowerOff>(); break;
+        case powerStop: break;
+        case locdata:
+            LocDataPtr = (locData*)(e.Data);
+            memcpy(&m_LocDataReceived, LocDataPtr, sizeof(locData));
+            updateLocInfoOnScreen(false);
+            break;
+        case programmingMode: break;
+        }
+    }
+
+    /**
+     * Handle button events.
+     */
+    void react(pushButtonsEvent const& e) override
+    {
+        uint8_t Function = 0;
+        switch (e.Button)
+        {
+        case button_power: m_XpNet.setPower(csNormal); break;
+        case button_0:
+        case button_1:
+        case button_2:
+        case button_3:
+        case button_4:
+            /* Get the assinged function to the button, toggle function and transmit data.*/
+            Function = m_LocLib.FunctionAssignedGet(static_cast<uint8_t>(e.Button));
+            m_LocLib.FunctionToggle(Function);
+
+            if (m_LocLib.FunctionStatusGet(Function) == LocLib::functionOn)
+            {
+                m_XpNet.setLocoFunc((uint8_t)(m_LocLib.GetActualLocAddress() >> 8),
+                    (uint8_t)(m_LocLib.GetActualLocAddress()), 1, Function);
+            }
+            else
+            {
+                m_XpNet.setLocoFunc((uint8_t)(m_LocLib.GetActualLocAddress() >> 8),
+                    (uint8_t)(m_LocLib.GetActualLocAddress()), 0, Function);
+            }
+            break;
+        case button_5: break;
         default: break;
         }
     };
@@ -561,14 +621,13 @@ class statePowerOn : public xmcApp
 /***********************************************************************************************************************
  * Turnout control.
  */
-class turnoutControl : public xmcApp
+class stateTurnoutControl : public xmcApp
 {
     /**
      * Show turnout screen.
      */
     void entry() override
     {
-        m_PowerStatus      = true;
         m_TurnOutDirection = 0;
 
         m_xmcTft.UpdateStatus("TURNOUT", true, WmcTft::color_green);
@@ -600,7 +659,7 @@ class turnoutControl : public xmcApp
         {
         case none:
         case powerOn: break;
-        case powerOff: transit<turnoutControlPowerOff>(); break;
+        case powerOff: transit<stateTurnoutControlPowerOff>(); break;
         case powerStop:
         case locdata: break;
         case programmingMode: break;
@@ -735,14 +794,14 @@ class turnoutControl : public xmcApp
 /***********************************************************************************************************************
  * Power off screen and handling for turnout control.
  */
-class turnoutControlPowerOff : public xmcApp
+class stateTurnoutControlPowerOff : public xmcApp
 {
     /**
      * Show turnout screen.
      */
     void entry() override
     {
-        m_PowerStatus = false;
+        m_PowerStatus = powerStatus::off;
         m_xmcTft.UpdateStatus("TURNOUT", true, WmcTft::color_red);
     };
 
@@ -754,7 +813,7 @@ class turnoutControlPowerOff : public xmcApp
         switch (e.dataType)
         {
         case none:
-        case powerOn: transit<turnoutControl>(); break;
+        case powerOn: transit<stateTurnoutControl>(); break;
         case powerOff: break;
         case powerStop:
         case locdata: break;
@@ -803,7 +862,7 @@ class turnoutControlPowerOff : public xmcApp
 /***********************************************************************************************************************
  * Show main menu and handle the request.
  */
-class mainMenu : public xmcApp
+class stateMainMenu : public xmcApp
 {
     /**
      * Show menu on screen.
@@ -842,17 +901,17 @@ class mainMenu : public xmcApp
         {
         case button_1:
             m_locAddressAdd = m_LocLib.GetActualLocAddress();
-            transit<menuLocAdd>();
+            transit<stateMenuLocAdd>();
             break;
-        case button_2: transit<menuLocFunctionsChange>(); break;
-        case button_3: transit<menuLocDelete>(); break;
+        case button_2: transit<stateMenuLocFunctionsChange>(); break;
+        case button_3: transit<stateMenuLocDelete>(); break;
         case button_4:
             m_CvPomProgramming = false;
-            transit<cvProgramming>();
+            transit<stateCvProgramming>();
             break;
         case button_5:
             m_CvPomProgramming = true;
-            transit<cvProgramming>();
+            transit<stateCvProgramming>();
             break;
         case button_power:
             m_LocSelection = true;
@@ -871,7 +930,7 @@ class mainMenu : public xmcApp
 /***********************************************************************************************************************
  * Add a loc.
  */
-class menuLocAdd : public xmcApp
+class stateMenuLocAdd : public xmcApp
 {
     /**
      * Show loc menu add screen.
@@ -911,14 +970,15 @@ class menuLocAdd : public xmcApp
         case pushturn: break;
         case pushedNormal:
         case pushedlong:
-            /* If loc is not present goto add functions else red address indicating loc already present. */
+            /* If loc is not present goto add functions else red address indicating loc already
+             * present. */
             if (m_LocLib.CheckLoc(m_locAddressAdd) != 255)
             {
                 m_xmcTft.ShowlocAddress(m_locAddressAdd, WmcTft::color_red);
             }
             else
             {
-                transit<menuLocFunctionsAdd>();
+                transit<stateMenuLocFunctionsAdd>();
             }
             break;
         default: break;
@@ -940,7 +1000,8 @@ class menuLocAdd : public xmcApp
         case button_3: m_locAddressAdd += 1000; break;
         case button_4: m_locAddressAdd = 1; break;
         case button_5:
-            /* If loc is not present goto add functions else red address indicating loc already present. */
+            /* If loc is not present goto add functions else red address indicating loc already
+             * present. */
             if (m_LocLib.CheckLoc(m_locAddressAdd) != 255)
             {
                 updateScreen = false;
@@ -948,12 +1009,12 @@ class menuLocAdd : public xmcApp
             }
             else
             {
-                transit<menuLocFunctionsAdd>();
+                transit<stateMenuLocFunctionsAdd>();
             }
             break;
         case button_power:
             updateScreen = false;
-            transit<mainMenu>();
+            transit<stateMainMenu>();
             break;
         case button_none: updateScreen = false; break;
         }
@@ -969,7 +1030,7 @@ class menuLocAdd : public xmcApp
 /***********************************************************************************************************************
  * Set the functions of the loc to be added.
  */
-class menuLocFunctionsAdd : public xmcApp
+class stateMenuLocFunctionsAdd : public xmcApp
 {
     /**
      * Show function add screen.
@@ -1025,7 +1086,7 @@ class menuLocFunctionsAdd : public xmcApp
             m_LocLib.StoreLoc(m_locAddressAdd, m_locFunctionAssignment, LocLib::storeAdd);
             m_LocLib.LocBubbleSort();
             m_locAddressAdd++;
-            transit<menuLocAdd>();
+            transit<stateMenuLocAdd>();
             break;
         default: break;
         }
@@ -1056,13 +1117,13 @@ class menuLocFunctionsAdd : public xmcApp
                     static_cast<uint8_t>(e.Button), m_locFunctionAssignment[static_cast<uint8_t>(e.Button)]);
             }
             break;
-        case button_power: transit<mainMenu>(); break;
+        case button_power: transit<stateMainMenu>(); break;
         case button_5:
             /* Store loc functions */
             m_LocLib.StoreLoc(m_locAddressAdd, m_locFunctionAssignment, LocLib::storeAdd);
             m_LocLib.LocBubbleSort();
             m_locAddressAdd++;
-            transit<menuLocAdd>();
+            transit<stateMenuLocAdd>();
             break;
         case button_none: break;
         }
@@ -1072,7 +1133,7 @@ class menuLocFunctionsAdd : public xmcApp
 /***********************************************************************************************************************
  * Changer functions of a loc already present.
  */
-class menuLocFunctionsChange : public xmcApp
+class stateMenuLocFunctionsChange : public xmcApp
 {
     /**
      * Show change function screen.
@@ -1178,7 +1239,7 @@ class menuLocFunctionsChange : public xmcApp
                     static_cast<uint8_t>(e.Button), m_locFunctionAssignment[static_cast<uint8_t>(e.Button)]);
             }
             break;
-        case button_power: transit<mainMenu>(); break;
+        case button_power: transit<stateMainMenu>(); break;
         case button_5:
             /* Store changed data and yellow text indicating data is stored. */
             m_LocLib.StoreLoc(m_locAddressChange, m_locFunctionAssignment, LocLib::storeChange);
@@ -1192,7 +1253,7 @@ class menuLocFunctionsChange : public xmcApp
 /***********************************************************************************************************************
  * Delete a loc.
  */
-class menuLocDelete : public xmcApp
+class stateMenuLocDelete : public xmcApp
 {
     /**
      * Show delete screen.
@@ -1245,7 +1306,7 @@ class menuLocDelete : public xmcApp
         case button_3:
         case button_4:
         case button_5:
-        case button_power: transit<mainMenu>(); break;
+        case button_power: transit<stateMainMenu>(); break;
         case button_none: break;
         }
     };
@@ -1254,7 +1315,7 @@ class menuLocDelete : public xmcApp
 /***********************************************************************************************************************
  * Command lie interface active state.
  */
-class commandLineInterfaceActive : public xmcApp
+class stateCommandLineInterfaceActive : public xmcApp
 {
     /**
      * Show delete screen.
@@ -1270,7 +1331,7 @@ class commandLineInterfaceActive : public xmcApp
 /***********************************************************************************************************************
  * CV programming main state.
  */
-class cvProgramming : public xmcApp
+class stateCvProgramming : public xmcApp
 {
     /**
      * Show delete screen.
@@ -1303,7 +1364,7 @@ class cvProgramming : public xmcApp
         {
         case none:
         case powerOn: break;
-        case powerOff: transit<turnoutControlPowerOff>(); break;
+        case powerOff: transit<stateTurnoutControlPowerOff>(); break;
         case powerStop:
         case locdata: break;
         case programmingMode: break;
@@ -1365,7 +1426,7 @@ class cvProgramming : public xmcApp
             send_event(EventCv);
             if (m_CvPomProgrammingFromPowerOn == false)
             {
-                transit<mainMenu>();
+                transit<stateMainMenu>();
             }
             else
             {
@@ -1393,7 +1454,7 @@ class cvProgramming : public xmcApp
             send_event(EventCv);
             if (m_CvPomProgrammingFromPowerOn == false)
             {
-                transit<mainMenu>();
+                transit<stateMainMenu>();
             }
             else
             {
@@ -1414,7 +1475,7 @@ class cvProgramming : public xmcApp
  */
 void xmcApp::react(XpNetEvent const&){};
 void xmcApp::react(xpNetEventUpdate const&) { m_XpNet.receive(); };
-void xmcApp::react(cliEnterEvent const&) { transit<commandLineInterfaceActive>(); };
+void xmcApp::react(cliEnterEvent const&) { transit<stateCommandLineInterfaceActive>(); };
 void xmcApp::react(updateEvent3sec const&){};
 void xmcApp::react(pushButtonsEvent const&){};
 void xmcApp::react(pulseSwitchEvent const&){};
@@ -1500,7 +1561,8 @@ void xmcApp::updateLocInfoOnScreen(bool updateAll)
             m_locFunctionAssignment[Index] = m_LocLib.FunctionAssignedGet(Index);
         }
 
-        /* Invert functions so function symbols are updated if new loc is selected and set new direction. */
+        /* Invert functions so function symbols are updated if new loc is selected and set new
+         * direction. */
         if (m_LocSelection == true)
         {
             m_LocDataRecievedPrevious.Functions = ~m_LocDataReceived.Functions;

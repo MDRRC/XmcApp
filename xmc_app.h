@@ -28,6 +28,16 @@
 class xmcApp : public tinyfsm::Fsm<xmcApp>
 {
 public:
+    /**
+     * Enum with application power status.
+     */
+    enum powerStatus
+    {
+        off = 0,
+        on,
+        emergency
+    };
+
     /* default reaction for unhandled events */
     void react(tinyfsm::Event const&){};
 
@@ -56,7 +66,7 @@ protected:
     static WmcCli m_WmcCommandLine;
     static uint8_t m_XpNetAddress;
     static uint8_t m_ConnectCount;
-    static bool m_PowerStatus;
+    static powerStatus m_PowerStatus;
     static bool m_LocSelection;
     static locData m_LocDataReceived;
     static locData m_LocDataRecievedPrevious;
