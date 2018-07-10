@@ -329,6 +329,11 @@ class statePowerOff : public xmcApp
         m_PowerStatus = powerStatus::off;
         m_xmcTft.UpdateStatus("POWER OFF", false, WmcTft::color_red);
         m_xmcTft.UpdateSelectedAndNumberOfLocs(m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
+
+        /* Stop loc and update info on screen. */
+        m_LocLib.SpeedSet(0);
+        m_LocDataReceived.Speed = 0;
+        updateLocInfoOnScreen(false);
     }
 
     /**
@@ -461,6 +466,7 @@ class statePowerOn : public xmcApp
         switch (e.Status)
         {
         case turn:
+
             if (m_LocLib.SpeedSet(e.Delta) == true)
             {
                 // Transmit loc speed etc. data.
@@ -558,8 +564,10 @@ class statePowerEmergencyStop : public xmcApp
         m_xmcTft.UpdateStatus("POWER ON ", true, WmcTft::color_yellow);
         m_xmcTft.UpdateSelectedAndNumberOfLocs(m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
 
-        /* Stop loc. */
+        /* Stop loc and update info on screen. */
         m_LocLib.SpeedSet(0);
+        m_LocDataReceived.Speed = 0;
+        updateLocInfoOnScreen(false);
     };
 
     /**
