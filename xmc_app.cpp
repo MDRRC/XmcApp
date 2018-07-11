@@ -940,11 +940,11 @@ class stateMainMenu : public xmcApp
         case button_3: transit<stateMenuLocDelete>(); break;
         case button_4:
             m_CvPomProgramming = false;
-            transit<stateCvProgramming>();
+            // transit<stateCvProgramming>();
             break;
         case button_5:
             m_CvPomProgramming = true;
-            transit<stateCvProgramming>();
+            // transit<stateCvProgramming>();
             break;
         case button_power:
             m_LocSelection = true;
