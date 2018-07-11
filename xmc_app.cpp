@@ -347,6 +347,7 @@ class statePowerOff : public xmcApp
         }
         else
         {
+            m_SkipRequestCnt = 2;
             m_XpNet.getLocoInfo(
                 (uint8_t)(m_LocLib.GetActualLocAddress() >> 8), (uint8_t)(m_LocLib.GetActualLocAddress()));
         }
@@ -368,6 +369,9 @@ class statePowerOff : public xmcApp
         case powerStop: break;
         case locdata:
             LocDataPtr = (locData*)(e.Data);
+
+            // Roco Multimaus keeps transmitting set speed... Force zero speed.
+            LocDataPtr->Speed = 0;
             memcpy(&m_LocDataReceived, LocDataPtr, sizeof(locData));
             updateLocInfoOnScreen(false);
             break;
@@ -392,7 +396,7 @@ class statePowerOff : public xmcApp
                 m_xmcTft.UpdateSelectedAndNumberOfLocs(
                     m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
                 m_LocSelection   = true;
-                m_SkipRequestCnt = 5;
+                m_SkipRequestCnt = 2;
             }
             break;
         case pushedShort:
@@ -435,6 +439,24 @@ class statePowerOn : public xmcApp
         m_PowerStatus = powerStatus::on;
         m_xmcTft.UpdateStatus("POWER ON ", false, WmcTft::color_green);
         m_xmcTft.UpdateSelectedAndNumberOfLocs(m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
+        m_SkipRequestCnt = 0;
+    }
+
+    /**
+     * Get loc info.
+     */
+    void react(updateEvent500msec const&) override
+    {
+        if (m_SkipRequestCnt > 0)
+        {
+            m_SkipRequestCnt--;
+        }
+        else
+        {
+            m_SkipRequestCnt = 2;
+            m_XpNet.getLocoInfo(
+                (uint8_t)(m_LocLib.GetActualLocAddress() >> 8), (uint8_t)(m_LocLib.GetActualLocAddress()));
+        }
     }
 
     /**
@@ -471,6 +493,7 @@ class statePowerOn : public xmcApp
             {
                 // Transmit loc speed etc. data.
                 preparAndTransmitLocoDriveCommand();
+                m_SkipRequestCnt = 2;
             }
             break;
         case pushturn:
@@ -483,7 +506,7 @@ class statePowerOn : public xmcApp
                 m_xmcTft.UpdateSelectedAndNumberOfLocs(
                     m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
                 m_LocSelection   = true;
-                m_SkipRequestCnt = 5;
+                m_SkipRequestCnt = 2;
             }
             break;
         case pushedShort:
@@ -499,11 +522,13 @@ class statePowerOn : public xmcApp
             }
             /* Transmit loc speed etc. data. */
             preparAndTransmitLocoDriveCommand();
+            m_SkipRequestCnt = 2;
             break;
         case pushedNormal:
             /* Change direction nad transmit loc data.. */
             m_LocLib.DirectionToggle();
             preparAndTransmitLocoDriveCommand();
+            m_SkipRequestCnt = 2;
             break;
         case pushedlong:
         default: break;
