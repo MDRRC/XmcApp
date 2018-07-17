@@ -1710,15 +1710,20 @@ void notifyLokAll(uint8_t Adr_High, uint8_t Adr_Low, boolean Busy, uint8_t Steps
         /* 128 speed decoder. */
         LocDataPtr->Speed = Speed;
         break;
+    default: LocDataPtr->Speed = 0; break;
     }
 
-    LocDataPtr->Direction = Direction;
-    LocDataPtr->Functions = (F0 & 0x0F) << 1;
-    LocDataPtr->Functions |= (F0 & 0x10) >> 4;
-    LocDataPtr->Functions |= (uint32_t)(F1) << 5;
-    LocDataPtr->Functions |= (uint32_t)(F2) << 13;
-    LocDataPtr->Functions |= (uint32_t)(F3) << 21;
-    LocDataPtr->Occupied = false;
+    /* The xpnet lib sends initial decoder steps 3, skip this value... */
+    if (LocDataPtr->Steps != 3)
+    {
+        LocDataPtr->Direction = Direction;
+        LocDataPtr->Functions = (F0 & 0x0F) << 1;
+        LocDataPtr->Functions |= (F0 & 0x10) >> 4;
+        LocDataPtr->Functions |= (uint32_t)(F1) << 5;
+        LocDataPtr->Functions |= (uint32_t)(F2) << 13;
+        LocDataPtr->Functions |= (uint32_t)(F3) << 21;
+        LocDataPtr->Occupied = false;
 
-    send_event(Event);
+        send_event(Event);
+    }
 }
