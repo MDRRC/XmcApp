@@ -260,8 +260,9 @@ class stateGetPowerStatus : public xmcApp
             m_PowerStatus = powerStatus::emergency;
             transit<stateGetLocData>();
             break;
-        case programmingMode:
         case locdata: break;
+        case programmingMode: break;
+        case cvResponse: break;
         }
     }
 };
@@ -313,6 +314,8 @@ class stateGetLocData : public xmcApp
             case powerStatus::on: transit<statePowerOn>(); break;
             case powerStatus::emergency: transit<statePowerEmergencyStop>(); break;
             }
+            break;
+        case cvResponse: break;
         }
     }
 };
@@ -376,6 +379,7 @@ class statePowerOff : public xmcApp
             updateLocInfoOnScreen(false);
             break;
         case programmingMode: break;
+        case cvResponse: break;
         }
     }
 
@@ -477,6 +481,7 @@ class statePowerOn : public xmcApp
             updateLocInfoOnScreen(false);
             break;
         case programmingMode: break;
+        case cvResponse: break;
         }
     }
 
@@ -613,6 +618,7 @@ class statePowerEmergencyStop : public xmcApp
             updateLocInfoOnScreen(false);
             break;
         case programmingMode: break;
+        case cvResponse: break;
         }
     }
 
@@ -696,6 +702,7 @@ class stateTurnoutControl : public xmcApp
         case powerStop:
         case locdata: break;
         case programmingMode: break;
+        case cvResponse: break;
         }
     }
 
@@ -851,6 +858,7 @@ class stateTurnoutControlPowerOff : public xmcApp
         case powerStop:
         case locdata: break;
         case programmingMode: break;
+        case cvResponse: break;
         }
     }
 
@@ -940,7 +948,7 @@ class stateMainMenu : public xmcApp
         case button_3: transit<stateMenuLocDelete>(); break;
         case button_4:
             m_CvPomProgramming = false;
-            // transit<stateCvProgramming>();
+            transit<stateCvProgramming>();
             break;
         case button_5:
             m_CvPomProgramming = true;
@@ -1393,14 +1401,34 @@ class stateCvProgramming : public xmcApp
      */
     void react(XpNetEvent const& e) override
     {
+        cvEvent EventCv;
+        cvResponseData* CvResponsePtr = NULL;
         switch (e.dataType)
         {
         case none:
         case powerOn: break;
-        case powerOff: transit<stateTurnoutControlPowerOff>(); break;
+        case powerOff: transit<statePowerOff>(); break;
         case powerStop:
         case locdata: break;
         case programmingMode: break;
+        case cvResponse:
+            CvResponsePtr = (cvResponseData*)(e.Data);
+
+            switch (CvResponsePtr->cvInfo)
+            {
+            case centralBusy: EventCv.EventData = responseBusy; break;
+            case centralReady: EventCv.EventData = responseReady; break;
+            case dataNotFound:
+            case centralShotCircuit:
+            case transmitError: EventCv.EventData = responseNok; break;
+            case dataReady:
+                EventCv.EventData = responseReady;
+                EventCv.cvNumber  = CvResponsePtr->cvNumber;
+                EventCv.cvValue   = CvResponsePtr->cvValue;
+                break;
+            }
+            send_event(EventCv);
+            break;
         }
     }
 
@@ -1481,6 +1509,10 @@ class stateCvProgramming : public xmcApp
         {
         case cvRead: m_XpNet.readCVMode(e.CvNumber); break;
         case cvWrite: m_XpNet.writeCVMode(e.CvNumber, e.CvValue); break;
+        case cvStatusRequest:
+            m_XpNet.getresultCV();
+            Serial.println("getresultCV");
+            break;
         case pomWrite: break;
         case cvExit:
             EventCv.EventData = stop;
@@ -1726,4 +1758,59 @@ void notifyLokAll(uint8_t Adr_High, uint8_t Adr_Low, boolean Busy, uint8_t Steps
 
         send_event(Event);
     }
+}
+
+/***********************************************************************************************************************
+ * Callback function for cv info.
+ */
+void notifyCVInfo(uint8_t State)
+{
+    XpNetEvent Event;
+
+    Event.dataType            = cvResponse;
+    cvResponseData* CvDataPtr = (cvResponseData*)(Event.Data);
+
+    switch (State)
+    {
+    case 0x02:
+        /*  Data not found. */
+        CvDataPtr->cvInfo = dataNotFound;
+        break;
+    case 0x01:
+        /* „Zentrale Busy“ */
+        CvDataPtr->cvInfo = centralBusy;
+        break;
+    case 0x00:
+        /* Zentrale Ready“ */
+        CvDataPtr->cvInfo = centralReady;
+        break;
+    case 0x03:
+        /* short-circuit */
+        CvDataPtr->cvInfo = centralShotCircuit;
+        break;
+    case 0xE1:
+        /* Transfer Error */
+        CvDataPtr->cvInfo = transmitError;
+        break;
+    default: CvDataPtr->cvInfo = dataNotFound; break;
+    }
+
+    send_event(Event);
+}
+
+/***********************************************************************************************************************
+ * Callback function for cv data.
+ */
+void notifyCVResult(uint8_t cvAdr, uint8_t cvData)
+{
+    XpNetEvent Event;
+
+    Event.dataType            = cvResponse;
+    cvResponseData* CvDataPtr = (cvResponseData*)(Event.Data);
+
+    CvDataPtr->cvNumber = cvAdr;
+    CvDataPtr->cvValue  = cvData;
+    CvDataPtr->cvInfo   = dataReady;
+
+    send_event(Event);
 }

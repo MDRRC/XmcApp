@@ -50,6 +50,7 @@ enum cvProgRequest
 {
     cvRead = 0,
     cvWrite,
+    cvStatusRequest,
     pomWrite,
     cvExit,
 };
@@ -62,6 +63,24 @@ enum xpNetDataType
     powerStop,
     programmingMode,
     locdata,
+    cvResponse,
+};
+
+enum xpCvInfo
+{
+    dataNotFound = 0,
+    centralBusy,
+    centralReady,
+    centralShotCircuit,
+    transmitError,
+    dataReady,
+};
+
+struct cvResponseData
+{
+    uint16_t cvNumber;
+    uint8_t cvValue;
+    xpCvInfo cvInfo;
 };
 
 struct locData
