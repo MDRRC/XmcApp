@@ -229,7 +229,7 @@ class stateGetPowerStatus : public xmcApp
     }
 
     /**
-     * Wait for "connection". If 500msec timer expires we did not get a (fast) response and we assume the
+     * Wait for "connection". If 500msec timer expires a (fast) response was not present and it is assumed the
      * module is not connected or detected....
      */
     void react(updateEvent500msec const&) override
