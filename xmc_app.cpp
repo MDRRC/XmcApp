@@ -1407,7 +1407,7 @@ class stateCvProgramming : public xmcApp
         {
         case none:
         case powerOn: break;
-        case powerOff: transit<statePowerOff>(); break;
+        case powerOff: transit<stateGetPowerStatus>(); break;
         case powerStop:
         case locdata: break;
         case programmingMode: break;
