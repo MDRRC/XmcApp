@@ -64,6 +64,7 @@ class stateGetLocData;
 class statePowerOff;
 class statePowerOn;
 class statePowerEmergencyStop;
+class stateProgrammingMode;
 class stateTurnoutControl;
 class stateTurnoutControlPowerOff;
 class stateMainMenu;
@@ -261,7 +262,10 @@ class stateGetPowerStatus : public xmcApp
             transit<stateGetLocData>();
             break;
         case locdata: break;
-        case programmingMode: break;
+        case programmingMode:
+            m_PowerStatus = powerStatus::progMode;
+            transit<stateProgrammingMode>();
+            break;
         case cvResponse: break;
         }
     }
@@ -299,8 +303,11 @@ class stateGetLocData : public xmcApp
         case none:
         case powerOn:
         case powerOff:
-        case powerStop:
-        case programmingMode: break;
+        case powerStop: break;
+        case programmingMode:
+            m_PowerStatus = powerStatus::progMode;
+            transit<stateProgrammingMode>();
+            break;
         case locdata:
             LocDataPtr = (locData*)(e.Data);
             memcpy(&m_LocDataReceived, LocDataPtr, sizeof(locData));
@@ -313,6 +320,7 @@ class stateGetLocData : public xmcApp
             case powerStatus::off: transit<statePowerOff>(); break;
             case powerStatus::on: transit<statePowerOn>(); break;
             case powerStatus::emergency: transit<statePowerEmergencyStop>(); break;
+            case powerStatus::progMode: transit<stateProgrammingMode>(); break;
             }
             break;
         case cvResponse: break;
@@ -378,7 +386,10 @@ class statePowerOff : public xmcApp
             memcpy(&m_LocDataReceived, LocDataPtr, sizeof(locData));
             updateLocInfoOnScreen(false);
             break;
-        case programmingMode: break;
+        case programmingMode:
+            m_PowerStatus = powerStatus::progMode;
+            transit<stateProgrammingMode>();
+            break;
         case cvResponse: break;
         }
     }
@@ -480,7 +491,10 @@ class statePowerOn : public xmcApp
             memcpy(&m_LocDataReceived, LocDataPtr, sizeof(locData));
             updateLocInfoOnScreen(false);
             break;
-        case programmingMode: break;
+        case programmingMode:
+            m_PowerStatus = powerStatus::progMode;
+            transit<stateProgrammingMode>();
+            break;
         case cvResponse: break;
         }
     }
@@ -586,7 +600,7 @@ class statePowerOn : public xmcApp
 class statePowerEmergencyStop : public xmcApp
 {
     /**
-     * Show turnout screen.
+     * Show Emergency stop screen.
      */
     void entry() override
     {
@@ -617,7 +631,10 @@ class statePowerEmergencyStop : public xmcApp
             memcpy(&m_LocDataReceived, LocDataPtr, sizeof(locData));
             updateLocInfoOnScreen(false);
             break;
-        case programmingMode: break;
+        case programmingMode:
+            m_PowerStatus = powerStatus::progMode;
+            transit<stateProgrammingMode>();
+            break;
         case cvResponse: break;
         }
     }
@@ -651,6 +668,59 @@ class statePowerEmergencyStop : public xmcApp
                     (uint8_t)(m_LocLib.GetActualLocAddress()), 0, Function);
             }
             break;
+        case button_5: break;
+        default: break;
+        }
+    };
+};
+
+/***********************************************************************************************************************
+ * External cv programmng active byu another device.
+ */
+class stateProgrammingMode : public xmcApp
+{
+    void entry() override
+    {
+        m_PowerStatus = powerStatus::progMode;
+        m_xmcTft.UpdateStatus("PROG MODE", true, WmcTft::color_yellow);
+        m_xmcTft.UpdateSelectedAndNumberOfLocs(m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
+
+        /* Stop loc and update info on screen. */
+        m_LocLib.SpeedSet(0);
+        m_LocDataReceived.Speed = 0;
+        updateLocInfoOnScreen(false);
+    };
+
+    /**
+     * Handle the response.
+     */
+    void react(XpNetEvent const& e) override
+    {
+        switch (e.dataType)
+        {
+        case none:
+        case powerOn: transit<statePowerOn>(); break;
+        case powerOff: transit<statePowerOff>(); break;
+        case powerStop:
+        case locdata:
+        case programmingMode:
+        case cvResponse: break;
+        }
+    }
+
+    /**
+     * Handle button events.
+     */
+    void react(pushButtonsEvent const& e) override
+    {
+        switch (e.Button)
+        {
+        case button_power: m_XpNet.setPower(csTrackVoltageOff); break;
+        case button_0:
+        case button_1:
+        case button_2:
+        case button_3:
+        case button_4:
         case button_5: break;
         default: break;
         }
@@ -701,7 +771,10 @@ class stateTurnoutControl : public xmcApp
         case powerOff: transit<stateTurnoutControlPowerOff>(); break;
         case powerStop:
         case locdata: break;
-        case programmingMode: break;
+        case programmingMode:
+            m_PowerStatus = powerStatus::progMode;
+            transit<stateProgrammingMode>();
+            break;
         case cvResponse: break;
         }
     }
@@ -857,7 +930,10 @@ class stateTurnoutControlPowerOff : public xmcApp
         case powerOff: break;
         case powerStop:
         case locdata: break;
-        case programmingMode: break;
+        case programmingMode:
+            m_PowerStatus = powerStatus::progMode;
+            transit<stateProgrammingMode>();
+            break;
         case cvResponse: break;
         }
     }
@@ -1417,7 +1493,10 @@ class stateCvProgramming : public xmcApp
             switch (CvResponsePtr->cvInfo)
             {
             case centralBusy: EventCv.EventData = responseBusy; break;
-            case centralReady: EventCv.EventData = responseReady; break;
+            case centralReady:
+                EventCv.cvValue   = 1;
+                EventCv.EventData = responseReady;
+                break;
             case dataNotFound:
             case centralShotCircuit:
             case transmitError: EventCv.EventData = responseNok; break;
@@ -1509,10 +1588,7 @@ class stateCvProgramming : public xmcApp
         {
         case cvRead: m_XpNet.readCVMode(e.CvNumber); break;
         case cvWrite: m_XpNet.writeCVMode(e.CvNumber, e.CvValue); break;
-        case cvStatusRequest:
-            m_XpNet.getresultCV();
-            Serial.println("getresultCV");
-            break;
+        case cvStatusRequest: m_XpNet.getresultCV(); break;
         case pomWrite: break;
         case cvExit:
             EventCv.EventData = stop;

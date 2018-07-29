@@ -35,7 +35,8 @@ public:
     {
         off = 0,
         on,
-        emergency
+        emergency,
+        progMode,
     };
 
     /* default reaction for unhandled events */
