@@ -9,6 +9,7 @@
 #include "xmc_app.h"
 #include "fsmlist.hpp"
 #include "tinyfsm.hpp"
+#include "version.h"
 #include "wmc_cv.h"
 #include "xmc_event.h"
 #include <EEPROM.h>
@@ -86,6 +87,8 @@ class stateInit : public xmcApp
     void entry() override
     {
         m_xmcTft.Init();
+        m_xmcTft.ShowVersion(SW_MAJOR, SW_MINOR, SW_PATCH);
+
         m_LocStorage.Init();
         m_LocLib.Init(m_LocStorage);
         m_WmcCommandLine.Init(m_LocLib, m_LocStorage);
