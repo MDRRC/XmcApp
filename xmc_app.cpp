@@ -111,6 +111,7 @@ class stateInit : public xmcApp
             else
             {
                 /* Valid XpNet address, start.... */
+                m_ConnectCount = 0;
                 transit<stateInitXpNet>();
             }
         }
