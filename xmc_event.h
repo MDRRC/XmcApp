@@ -64,6 +64,7 @@ enum xpNetDataType
     programmingMode,
     locdata,
     cvResponse,
+    locDataBase,
 };
 
 enum xpCvInfo
@@ -76,6 +77,9 @@ enum xpCvInfo
     dataReady,
 };
 
+/**
+ * Struct for CV reponse data.
+ */
 struct cvResponseData
 {
     uint16_t cvNumber;
@@ -83,6 +87,9 @@ struct cvResponseData
     xpCvInfo cvInfo;
 };
 
+/**
+ * Strucv with loc response data.
+ */
 struct locData
 {
     uint16_t Address;
@@ -92,6 +99,18 @@ struct locData
     uint32_t Functions;
     bool Occupied;
 };
+
+/**
+ * Struct with loc data base data
+ */
+struct locDatabaseData
+{
+    uint16_t Address;
+    uint16_t Number;
+    uint16_t Total;
+    char NameStr[10];
+};
+
 /**
  * Pulse switch event.
  */

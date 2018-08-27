@@ -68,7 +68,8 @@ class statePowerEmergencyStop;
 class stateProgrammingMode;
 class stateTurnoutControl;
 class stateTurnoutControlPowerOff;
-class stateMainMenu;
+class stateMainMenu_1;
+class stateMainMenu_2;
 class stateMenuLocAdd;
 class stateMenuLocFunctionsAdd;
 class stateMenuLocFunctionsChange;
@@ -270,7 +271,8 @@ class stateGetPowerStatus : public xmcApp
             m_PowerStatus = powerStatus::progMode;
             transit<stateProgrammingMode>();
             break;
-        case cvResponse: break;
+        case cvResponse:
+        case locDataBase: break;
         }
     }
 };
@@ -327,7 +329,8 @@ class stateGetLocData : public xmcApp
             case powerStatus::progMode: transit<stateProgrammingMode>(); break;
             }
             break;
-        case cvResponse: break;
+        case cvResponse:
+        case locDataBase: break;
         }
     }
 };
@@ -373,7 +376,8 @@ class statePowerOff : public xmcApp
      */
     void react(XpNetEvent const& e) override
     {
-        locData* LocDataPtr = NULL;
+        locData* LocDataPtr             = NULL;
+        locDatabaseData* locDatabasePtr = NULL;
 
         switch (e.dataType)
         {
@@ -385,7 +389,7 @@ class statePowerOff : public xmcApp
         case locdata:
             LocDataPtr = (locData*)(e.Data);
 
-            // Roco Multimaus keeps transmitting set speed... Force zero speed.
+            /* Roco Multimaus keeps transmitting set speed... Force zero speed. */
             LocDataPtr->Speed = 0;
             memcpy(&m_LocDataReceived, LocDataPtr, sizeof(locData));
             updateLocInfoOnScreen(false);
@@ -394,6 +398,27 @@ class statePowerOff : public xmcApp
             m_PowerStatus = powerStatus::progMode;
             transit<stateProgrammingMode>();
             break;
+        case locDataBase:
+        {
+            locDatabasePtr                   = (locDatabaseData*)(e.Data);
+            uint8_t locFunctionAssignment[5] = { 0, 1, 2, 3, 4 };
+
+            /* If loc not in data base add it... */
+            if (m_LocLib.CheckLoc(locDatabasePtr->Address) == 255)
+            {
+                m_LocLib.StoreLoc(locDatabasePtr->Address, locFunctionAssignment, LocLib::storeAdd);
+                m_xmcTft.UpdateSelectedAndNumberOfLocs(
+                    m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
+
+                /* If all locs received sort... */
+                locDatabasePtr->Number++;
+                if (locDatabasePtr->Number == locDatabasePtr->Total)
+                {
+                    m_LocLib.LocBubbleSort();
+                }
+            }
+        }
+        break;
         case cvResponse: break;
         }
     }
@@ -422,7 +447,7 @@ class statePowerOff : public xmcApp
             /* Power on request. */
             m_XpNet.setPower(csNormal);
             break;
-        case pushedlong: transit<stateMainMenu>(); break;
+        case pushedlong: transit<stateMainMenu_1>(); break;
         default: break;
         }
     }
@@ -499,6 +524,7 @@ class statePowerOn : public xmcApp
             m_PowerStatus = powerStatus::progMode;
             transit<stateProgrammingMode>();
             break;
+        case locDataBase:
         case cvResponse: break;
         }
     }
@@ -639,7 +665,8 @@ class statePowerEmergencyStop : public xmcApp
             m_PowerStatus = powerStatus::progMode;
             transit<stateProgrammingMode>();
             break;
-        case cvResponse: break;
+        case cvResponse:
+        case locDataBase: break;
         }
     }
 
@@ -708,7 +735,8 @@ class stateProgrammingMode : public xmcApp
         case powerStop:
         case locdata:
         case programmingMode:
-        case cvResponse: break;
+        case cvResponse:
+        case locDataBase: break;
         }
     }
 
@@ -779,7 +807,8 @@ class stateTurnoutControl : public xmcApp
             m_PowerStatus = powerStatus::progMode;
             transit<stateProgrammingMode>();
             break;
-        case cvResponse: break;
+        case cvResponse:
+        case locDataBase: break;
         }
     }
 
@@ -938,7 +967,8 @@ class stateTurnoutControlPowerOff : public xmcApp
             m_PowerStatus = powerStatus::progMode;
             transit<stateProgrammingMode>();
             break;
-        case cvResponse: break;
+        case cvResponse:
+        case locDataBase: break;
         }
     }
 
@@ -981,16 +1011,16 @@ class stateTurnoutControlPowerOff : public xmcApp
 };
 
 /***********************************************************************************************************************
- * Show main menu and handle the request.
+ * Show first main menu  and handle the request.
  */
-class stateMainMenu : public xmcApp
+class stateMainMenu_1 : public xmcApp
 {
     /**
      * Show menu on screen.
      */
     void entry() override
     {
-        m_xmcTft.ShowMenu();
+        m_xmcTft.ShowMenu1();
         m_XpNet.setPower(csTrackVoltageOff);
     };
 
@@ -1001,7 +1031,7 @@ class stateMainMenu : public xmcApp
     {
         switch (e.Status)
         {
-        case turn:
+        case turn: transit<stateMainMenu_2>(); break;
         case pushturn: break;
         case pushedShort:
         case pushedNormal:
@@ -1039,9 +1069,76 @@ class stateMainMenu : public xmcApp
             transit<stateGetPowerStatus>();
             break;
         case button_0:
+        case button_none: break;
+        }
+    };
+};
+
+/***********************************************************************************************************************
+ * Show first main menu  and handle the request.
+ */
+class stateMainMenu_2 : public xmcApp
+{
+    /**
+     * Show menu on screen.
+     */
+    void entry() override
+    {
+        m_xmcTft.ShowMenu2();
+        m_XpNet.setPower(csTrackVoltageOff);
+    };
+
+    /**
+     * Handle pulse switch events.
+     */
+    void react(pulseSwitchEvent const& e) override
+    {
+        switch (e.Status)
+        {
+        case turn: transit<stateMainMenu_1>(); break;
+        case pushturn: break;
+        case pushedShort:
+        case pushedNormal:
+        case pushedlong:
+            m_LocSelection = true;
+            transit<stateGetPowerStatus>();
+            break;
+        }
+    }
+
+    /**
+     * Handle switch events.
+     */
+    void react(pushButtonsEvent const& e) override
+    {
+        /* Handle menu request. */
+        switch (e.Button)
+        {
+        case button_0: break;
+        case button_1:
             // Set invalid XpNet device address and go to Xp address menu.
             m_LocStorage.XpNetAddressSet(255);
             transit<stateCheckXpNetAddress>();
+            break;
+        case button_2:
+            // Erase loc info and perform reset.
+        	m_xmcTft.ShowErase();
+            m_LocLib.InitialLocStore();
+            m_LocStorage.NumberOfLocsSet(1);
+            nvic_sys_reset();
+            break;
+        case button_3:
+            // Erase loc info and set invalid XpNet address.
+        	m_xmcTft.ShowErase();
+            m_LocLib.InitialLocStore();
+            m_LocStorage.XpNetAddressSet(255);
+            transit<stateCheckXpNetAddress>();
+            break;
+        case button_4:
+        case button_5:
+        case button_power:
+            m_LocSelection = true;
+            transit<stateGetPowerStatus>();
             break;
         case button_none: break;
         }
@@ -1135,7 +1232,7 @@ class stateMenuLocAdd : public xmcApp
             break;
         case button_power:
             updateScreen = false;
-            transit<stateMainMenu>();
+            transit<stateMainMenu_1>();
             break;
         case button_none: updateScreen = false; break;
         }
@@ -1238,7 +1335,7 @@ class stateMenuLocFunctionsAdd : public xmcApp
                     static_cast<uint8_t>(e.Button), m_locFunctionAssignment[static_cast<uint8_t>(e.Button)]);
             }
             break;
-        case button_power: transit<stateMainMenu>(); break;
+        case button_power: transit<stateMainMenu_1>(); break;
         case button_5:
             /* Store loc functions */
             m_LocLib.StoreLoc(m_locAddressAdd, m_locFunctionAssignment, LocLib::storeAdd);
@@ -1360,7 +1457,7 @@ class stateMenuLocFunctionsChange : public xmcApp
                     static_cast<uint8_t>(e.Button), m_locFunctionAssignment[static_cast<uint8_t>(e.Button)]);
             }
             break;
-        case button_power: transit<stateMainMenu>(); break;
+        case button_power: transit<stateMainMenu_1>(); break;
         case button_5:
             /* Store changed data and yellow text indicating data is stored. */
             m_LocLib.StoreLoc(m_locAddressChange, m_locFunctionAssignment, LocLib::storeChange);
@@ -1427,7 +1524,7 @@ class stateMenuLocDelete : public xmcApp
         case button_3:
         case button_4:
         case button_5:
-        case button_power: transit<stateMainMenu>(); break;
+        case button_power: transit<stateMainMenu_1>(); break;
         case button_none: break;
         }
     };
@@ -1489,7 +1586,8 @@ class stateCvProgramming : public xmcApp
         case powerOn: break;
         case powerOff: transit<stateGetPowerStatus>(); break;
         case powerStop:
-        case locdata: break;
+        case locdata:
+        case locDataBase:
         case programmingMode: break;
         case cvResponse:
             CvResponsePtr = (cvResponseData*)(e.Data);
@@ -1570,7 +1668,7 @@ class stateCvProgramming : public xmcApp
             send_event(EventCv);
             if (m_CvPomProgrammingFromPowerOn == false)
             {
-                transit<stateMainMenu>();
+                transit<stateMainMenu_1>();
             }
             else
             {
@@ -1599,7 +1697,7 @@ class stateCvProgramming : public xmcApp
             send_event(EventCv);
             if (m_CvPomProgrammingFromPowerOn == false)
             {
-                transit<stateMainMenu>();
+                transit<stateMainMenu_1>();
             }
             else
             {
@@ -1838,6 +1936,26 @@ void notifyLokAll(uint8_t Adr_High, uint8_t Adr_Low, boolean Busy, uint8_t Steps
 
         send_event(Event);
     }
+}
+
+/***********************************************************************************************************************
+ * Callback function for loc data base data.
+ */
+void notifyLokDataBaseDataReceive(
+    uint8_t Adr_High, uint8_t Adr_Low, uint8_t LocCount, uint8_t NumberOfLocs, char* LocName)
+{
+    XpNetEvent Event;
+    LocName = LocName;
+
+    locDatabaseData* LocDatabaseDataPtr = (locDatabaseData*)(Event.Data);
+    Event.dataType                      = locDataBase;
+
+    LocDatabaseDataPtr->Address = (uint16)(Adr_High) << 8;
+    LocDatabaseDataPtr->Address |= (uint16)(Adr_Low);
+    LocDatabaseDataPtr->Number = LocCount;
+    LocDatabaseDataPtr->Total  = NumberOfLocs;
+
+    send_event(Event);
 }
 
 /***********************************************************************************************************************
