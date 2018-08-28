@@ -180,6 +180,7 @@ class stateCheckXpNetAddress : public xmcApp
         case pushedlong:
             /* Store selected address and reset to activate new address. */
             m_LocStorage.XpNetAddressSet(m_XpNetAddress);
+            m_xmcTft.Clear();
             nvic_sys_reset();
             break;
         case pushedShort: break;
@@ -414,7 +415,9 @@ class statePowerOff : public xmcApp
                 locDatabasePtr->Number++;
                 if (locDatabasePtr->Number == locDatabasePtr->Total)
                 {
+                    m_xmcTft.UpdateStatus("SORTING  ", false, WmcTft::color_white);
                     m_LocLib.LocBubbleSort();
+                    m_xmcTft.UpdateStatus("POWER OFF", false, WmcTft::color_red);
                 }
             }
         }
@@ -1122,14 +1125,15 @@ class stateMainMenu_2 : public xmcApp
             break;
         case button_2:
             // Erase loc info and perform reset.
-        	m_xmcTft.ShowErase();
+            m_xmcTft.ShowErase();
             m_LocLib.InitialLocStore();
             m_LocStorage.NumberOfLocsSet(1);
+            m_xmcTft.Clear();
             nvic_sys_reset();
             break;
         case button_3:
             // Erase loc info and set invalid XpNet address.
-        	m_xmcTft.ShowErase();
+            m_xmcTft.ShowErase();
             m_LocLib.InitialLocStore();
             m_LocStorage.XpNetAddressSet(255);
             transit<stateCheckXpNetAddress>();
@@ -1301,6 +1305,7 @@ class stateMenuLocFunctionsAdd : public xmcApp
             break;
         case pushedNormal:
             /* Store loc functions */
+            m_xmcTft.UpdateStatus("SORTING  ", false, WmcTft::color_white);
             m_LocLib.StoreLoc(m_locAddressAdd, m_locFunctionAssignment, LocLib::storeAdd);
             m_LocLib.LocBubbleSort();
             m_locAddressAdd++;
@@ -1338,6 +1343,7 @@ class stateMenuLocFunctionsAdd : public xmcApp
         case button_power: transit<stateMainMenu_1>(); break;
         case button_5:
             /* Store loc functions */
+            m_xmcTft.UpdateStatus("SORTING  ", false, WmcTft::color_white);
             m_LocLib.StoreLoc(m_locAddressAdd, m_locFunctionAssignment, LocLib::storeAdd);
             m_LocLib.LocBubbleSort();
             m_locAddressAdd++;
