@@ -1880,12 +1880,12 @@ void xmcApp::StoreAndSortLocDatabaseData(void)
         /* If loc not in data base add it... */
         if (m_LocLib.CheckLoc(m_locDbData[Index]) == 255)
         {
-            m_LocLib.StoreLoc(m_locDbData[Index], locFunctionAssignment, LocLib::storeAdd);
+            m_LocLib.StoreLoc(m_locDbData[Index], locFunctionAssignment, LocLib::storeAddNoAutoSelect);
+
+            /* Show increasing counter. */
+            m_xmcTft.UpdateSelectedAndNumberOfLocs(m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
         }
     }
-
-    /* SHow after adding number of locs. */
-    m_xmcTft.UpdateSelectedAndNumberOfLocs(m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
 
     /* If all added sort... */
     m_xmcTft.UpdateStatus("SORTING  ", false, WmcTft::color_white);
