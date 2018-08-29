@@ -1137,6 +1137,7 @@ class stateMainMenu_2 : public xmcApp
             // Erase loc info and set invalid XpNet address.
             m_xmcTft.ShowErase();
             m_LocLib.InitialLocStore();
+            m_LocStorage.AcOptionSet(0);
             m_LocStorage.XpNetAddressSet(255);
             transit<stateCheckXpNetAddress>();
             break;
