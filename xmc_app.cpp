@@ -37,6 +37,8 @@ WmcTft::locoInfo xmcApp::locInfoActual;
 WmcTft::locoInfo xmcApp::locInfoPrevious;
 locData xmcApp::m_LocDataRecievedPrevious;
 uint8_t xmcApp::m_locFunctionAssignment[5];
+uint16_t xmcApp::m_locDbData[200];
+uint16_t xmcApp::m_locDbDataCnt;
 xmcApp::powerStatus xmcApp::m_PowerStatus  = off;
 bool xmcApp::m_LocSelection                = false;
 uint8_t xmcApp::m_XpNetAddress             = 0;
@@ -345,7 +347,8 @@ class statePowerOff : public xmcApp
      */
     void entry() override
     {
-        m_PowerStatus = powerStatus::off;
+        m_PowerStatus  = powerStatus::off;
+        m_locDbDataCnt = 0;
         m_xmcTft.UpdateStatus("POWER OFF", false, WmcTft::color_red);
         m_xmcTft.UpdateSelectedAndNumberOfLocs(m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
 
@@ -401,24 +404,23 @@ class statePowerOff : public xmcApp
             break;
         case locDataBase:
         {
-            locDatabasePtr                   = (locDatabaseData*)(e.Data);
-            uint8_t locFunctionAssignment[5] = { 0, 1, 2, 3, 4 };
+            locDatabasePtr = (locDatabaseData*)(e.Data);
 
-            /* If loc not in data base add it... */
-            if (m_LocLib.CheckLoc(locDatabasePtr->Address) == 255)
+            /* First database entry received? Reset counter. */
+            if (locDatabasePtr->Number == 0)
             {
-                m_LocLib.StoreLoc(locDatabasePtr->Address, locFunctionAssignment, LocLib::storeAdd);
-                m_xmcTft.UpdateSelectedAndNumberOfLocs(
-                    m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
+                m_locDbDataCnt = 0;
+                m_xmcTft.UpdateStatus("RECEIVING", false, WmcTft::color_white);
+            }
 
-                /* If all locs received sort... */
-                locDatabasePtr->Number++;
-                if (locDatabasePtr->Number == locDatabasePtr->Total)
-                {
-                    m_xmcTft.UpdateStatus("SORTING  ", false, WmcTft::color_white);
-                    m_LocLib.LocBubbleSort();
-                    m_xmcTft.UpdateStatus("POWER OFF", false, WmcTft::color_red);
-                }
+            /* Add received loc address */
+            m_locDbData[m_locDbDataCnt] = locDatabasePtr->Address;
+            m_locDbDataCnt++;
+
+            /* All received? Store and sort data. */
+            if ((locDatabasePtr->Number + 1) == locDatabasePtr->Total)
+            {
+                StoreAndSortLocDatabaseData();
             }
         }
         break;
@@ -1861,6 +1863,34 @@ void xmcApp::preparAndTransmitLocoDriveCommand(void)
         (uint8_t)(m_LocLib.GetActualLocAddress() >> 8), (uint8_t)(m_LocLib.GetActualLocAddress()), Steps, Speed);
     m_XpNet.getLocoInfo((uint8_t)(m_LocLib.GetActualLocAddress() >> 8), (uint8_t)(m_LocLib.GetActualLocAddress()));
     m_SkipRequestCnt = 5;
+}
+
+/***********************************************************************************************************************
+ * Store and sort received loc data.
+ */
+void xmcApp::StoreAndSortLocDatabaseData(void)
+{
+    uint16_t Index;
+    uint8_t locFunctionAssignment[5] = { 0, 1, 2, 3, 4 };
+
+    m_xmcTft.UpdateStatus("STORING  ", false, WmcTft::color_white);
+
+    for (Index = 0; Index < m_locDbDataCnt; Index++)
+    {
+        /* If loc not in data base add it... */
+        if (m_LocLib.CheckLoc(m_locDbData[Index]) == 255)
+        {
+            m_LocLib.StoreLoc(m_locDbData[Index], locFunctionAssignment, LocLib::storeAdd);
+        }
+    }
+
+    /* SHow after adding number of locs. */
+    m_xmcTft.UpdateSelectedAndNumberOfLocs(m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
+
+    /* If all added sort... */
+    m_xmcTft.UpdateStatus("SORTING  ", false, WmcTft::color_white);
+    m_LocLib.LocBubbleSort();
+    m_xmcTft.UpdateStatus("POWER OFF", false, WmcTft::color_red);
 }
 
 /***********************************************************************************************************************

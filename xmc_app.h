@@ -58,6 +58,7 @@ public:
     void convertLocDataToDisplayData(locData* XpDataPtr, WmcTft::locoInfo* TftDataPtr);
     void updateLocInfoOnScreen(bool updateAll);
     void preparAndTransmitLocoDriveCommand(void);
+    void StoreAndSortLocDatabaseData(void);
 
 protected:
     static WmcTft m_xmcTft;
@@ -85,6 +86,9 @@ protected:
     static uint16_t m_locAddressDelete;
     static uint8_t m_locFunctionAdd;
     static uint8_t m_locFunctionChange;
+
+    static uint16_t m_locDbData[200];
+    static uint16_t m_locDbDataCnt;
 
     static const uint16_t ADDRESS_TURNOUT_MIN = 1;
     static const uint16_t ADDRESS_TURNOUT_MAX = 9999;
