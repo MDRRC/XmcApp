@@ -1152,7 +1152,7 @@ class stateMainMenu2 : public xmcApp
             break;
         case button_3: break;
         case button_4:
-            // Erase loc info and perform reset.
+            /* Erase loc info and perform reset. */
             m_xmcTft.ShowErase();
             m_LocLib.InitialLocStore();
             m_LocStorage.NumberOfLocsSet(1);
@@ -1160,12 +1160,13 @@ class stateMainMenu2 : public xmcApp
             nvic_sys_reset();
             break;
         case button_5:
-            // Erase loc info and set invalid XpNet address.
+            /* Erase loc info and set invalid XpNet address. */
             m_xmcTft.ShowErase();
             m_LocLib.InitialLocStore();
             m_LocStorage.AcOptionSet(0);
             m_LocStorage.NumberOfLocsSet(1);
             m_LocStorage.XpNetAddressSet(255);
+            m_LocStorage.EmergencyOptionSet(0);
             transit<stateCheckXpNetAddress>();
             break;
         case button_power:
