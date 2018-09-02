@@ -81,6 +81,7 @@ protected:
     static uint32_t m_TurnoutOffDelay;
     static bool m_CvPomProgramming;
     static bool m_CvPomProgrammingFromPowerOn;
+    static bool m_EmergencyStopEnabled;
     static uint16_t m_locAddressAdd;
     static uint16_t m_locAddressChange;
     static uint16_t m_locAddressDelete;

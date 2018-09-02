@@ -49,6 +49,7 @@ uint8_t xmcApp::m_TurnOutDirection         = 0;
 uint32_t xmcApp::m_TurnoutOffDelay         = 0;
 bool xmcApp::m_CvPomProgrammingFromPowerOn = false;
 bool xmcApp::m_CvPomProgramming            = false;
+bool xmcApp::m_EmergencyStopEnabled        = false;
 uint16_t xmcApp::m_locAddressAdd           = 1;
 uint16_t xmcApp::m_locAddressChange        = 1;
 uint16_t xmcApp::m_locAddressDelete        = 1;
@@ -70,8 +71,8 @@ class statePowerEmergencyStop;
 class stateProgrammingMode;
 class stateTurnoutControl;
 class stateTurnoutControlPowerOff;
-class stateMainMenu_1;
-class stateMainMenu_2;
+class stateMainMenu1;
+class stateMainMenu2;
 class stateMenuLocAdd;
 class stateMenuLocFunctionsAdd;
 class stateMenuLocFunctionsChange;
@@ -452,7 +453,7 @@ class statePowerOff : public xmcApp
             /* Power on request. */
             m_XpNet.setPower(csNormal);
             break;
-        case pushedlong: transit<stateMainMenu_1>(); break;
+        case pushedlong: transit<stateMainMenu1>(); break;
         default: break;
         }
     }
@@ -597,7 +598,16 @@ class statePowerOn : public xmcApp
         uint8_t Function = 0;
         switch (e.Button)
         {
-        case button_power: m_XpNet.setPower(csTrackVoltageOff); break;
+        case button_power:
+            if (m_EmergencyStopEnabled == false)
+            {
+                m_XpNet.setPower(csTrackVoltageOff);
+            }
+            else
+            {
+                m_XpNet.setPower(csEmergencyStop);
+            }
+            break;
         case button_0:
         case button_1:
         case button_2:
@@ -1018,7 +1028,7 @@ class stateTurnoutControlPowerOff : public xmcApp
 /***********************************************************************************************************************
  * Show first main menu  and handle the request.
  */
-class stateMainMenu_1 : public xmcApp
+class stateMainMenu1 : public xmcApp
 {
     /**
      * Show menu on screen.
@@ -1036,7 +1046,7 @@ class stateMainMenu_1 : public xmcApp
     {
         switch (e.Status)
         {
-        case turn: transit<stateMainMenu_2>(); break;
+        case turn: transit<stateMainMenu2>(); break;
         case pushturn: break;
         case pushedShort:
         case pushedNormal:
@@ -1082,14 +1092,14 @@ class stateMainMenu_1 : public xmcApp
 /***********************************************************************************************************************
  * Show first main menu  and handle the request.
  */
-class stateMainMenu_2 : public xmcApp
+class stateMainMenu2 : public xmcApp
 {
     /**
      * Show menu on screen.
      */
     void entry() override
     {
-        m_xmcTft.ShowMenu2();
+        m_xmcTft.ShowMenu2(m_LocStorage.EmergencyOptionGet(), true);
         m_XpNet.setPower(csTrackVoltageOff);
     };
 
@@ -1100,7 +1110,7 @@ class stateMainMenu_2 : public xmcApp
     {
         switch (e.Status)
         {
-        case turn: transit<stateMainMenu_1>(); break;
+        case turn: transit<stateMainMenu1>(); break;
         case pushturn: break;
         case pushedShort:
         case pushedNormal:
@@ -1126,6 +1136,22 @@ class stateMainMenu_2 : public xmcApp
             transit<stateCheckXpNetAddress>();
             break;
         case button_2:
+            /* Toggle emergency stop or power off for power button. */
+            if (m_LocStorage.EmergencyOptionGet() == false)
+            {
+                m_LocStorage.EmergencyOptionSet(1);
+                m_EmergencyStopEnabled = true;
+                m_xmcTft.ShowMenu2(true, false);
+            }
+            else
+            {
+                m_LocStorage.EmergencyOptionSet(0);
+                m_EmergencyStopEnabled = false;
+                m_xmcTft.ShowMenu2(false, false);
+            }
+            break;
+        case button_3: break;
+        case button_4:
             // Erase loc info and perform reset.
             m_xmcTft.ShowErase();
             m_LocLib.InitialLocStore();
@@ -1133,16 +1159,15 @@ class stateMainMenu_2 : public xmcApp
             m_xmcTft.Clear();
             nvic_sys_reset();
             break;
-        case button_3:
+        case button_5:
             // Erase loc info and set invalid XpNet address.
             m_xmcTft.ShowErase();
             m_LocLib.InitialLocStore();
             m_LocStorage.AcOptionSet(0);
+            m_LocStorage.NumberOfLocsSet(1);
             m_LocStorage.XpNetAddressSet(255);
             transit<stateCheckXpNetAddress>();
             break;
-        case button_4:
-        case button_5:
         case button_power:
             m_LocSelection = true;
             transit<stateGetPowerStatus>();
@@ -1239,7 +1264,7 @@ class stateMenuLocAdd : public xmcApp
             break;
         case button_power:
             updateScreen = false;
-            transit<stateMainMenu_1>();
+            transit<stateMainMenu1>();
             break;
         case button_none: updateScreen = false; break;
         }
@@ -1343,7 +1368,7 @@ class stateMenuLocFunctionsAdd : public xmcApp
                     static_cast<uint8_t>(e.Button), m_locFunctionAssignment[static_cast<uint8_t>(e.Button)]);
             }
             break;
-        case button_power: transit<stateMainMenu_1>(); break;
+        case button_power: transit<stateMainMenu1>(); break;
         case button_5:
             /* Store loc functions */
             m_xmcTft.UpdateStatus("SORTING  ", false, WmcTft::color_white);
@@ -1466,7 +1491,7 @@ class stateMenuLocFunctionsChange : public xmcApp
                     static_cast<uint8_t>(e.Button), m_locFunctionAssignment[static_cast<uint8_t>(e.Button)]);
             }
             break;
-        case button_power: transit<stateMainMenu_1>(); break;
+        case button_power: transit<stateMainMenu1>(); break;
         case button_5:
             /* Store changed data and yellow text indicating data is stored. */
             m_LocLib.StoreLoc(m_locAddressChange, m_locFunctionAssignment, LocLib::storeChange);
@@ -1533,7 +1558,7 @@ class stateMenuLocDelete : public xmcApp
         case button_3:
         case button_4:
         case button_5:
-        case button_power: transit<stateMainMenu_1>(); break;
+        case button_power: transit<stateMainMenu1>(); break;
         case button_none: break;
         }
     };
@@ -1677,7 +1702,7 @@ class stateCvProgramming : public xmcApp
             send_event(EventCv);
             if (m_CvPomProgrammingFromPowerOn == false)
             {
-                transit<stateMainMenu_1>();
+                transit<stateMainMenu1>();
             }
             else
             {
@@ -1706,7 +1731,7 @@ class stateCvProgramming : public xmcApp
             send_event(EventCv);
             if (m_CvPomProgrammingFromPowerOn == false)
             {
-                transit<stateMainMenu_1>();
+                transit<stateMainMenu1>();
             }
             else
             {
