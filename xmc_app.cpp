@@ -686,6 +686,26 @@ class statePowerEmergencyStop : public xmcApp
     }
 
     /**
+     * Check pulse switch event data.
+     */
+    void react(pulseSwitchEvent const& e) override
+    {
+        switch (e.Status)
+        {
+        case turn:
+        case pushturn:
+        case pushedShort: break;
+        case pushedNormal:
+            m_LocLib.DirectionToggle();
+            preparAndTransmitLocoDriveCommand();
+            m_SkipRequestCnt = 2;
+            break;
+        case pushedlong:
+        default: break;
+        }
+    };
+
+    /**
      * Handle button events.
      */
     void react(pushButtonsEvent const& e) override
