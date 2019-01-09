@@ -57,7 +57,7 @@ public:
 
     void convertLocDataToDisplayData(locData* XpDataPtr, WmcTft::locoInfo* TftDataPtr);
     void updateLocInfoOnScreen(bool updateAll);
-    void preparAndTransmitLocoDriveCommand(void);
+    void preparAndTransmitLocoDriveCommand(uint16_t SpeedSet);
     void StoreAndSortLocDatabaseData(void);
 
 protected:

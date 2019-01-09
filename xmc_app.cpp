@@ -357,6 +357,7 @@ class statePowerOff : public xmcApp
         m_LocLib.SpeedSet(0);
         m_LocDataReceived.Speed = 0;
         updateLocInfoOnScreen(false);
+        preparAndTransmitLocoDriveCommand(m_LocLib.SpeedGet());
     }
 
     /**
@@ -364,6 +365,7 @@ class statePowerOff : public xmcApp
      */
     void react(updateEvent500msec const&) override
     {
+        // If command transmitetd wait a little...
         if (m_SkipRequestCnt > 0)
         {
             m_SkipRequestCnt--;
@@ -540,15 +542,16 @@ class statePowerOn : public xmcApp
      */
     void react(pulseSwitchEvent const& e) override
     {
+        uint16_t Speed = 0;
+
         switch (e.Status)
         {
         case turn:
-
-            if (m_LocLib.SpeedSet(e.Delta) == true)
+            Speed = m_LocLib.SpeedSet(e.Delta);
+            if (Speed != 0xFFFF)
             {
                 // Transmit loc speed etc. data.
-                preparAndTransmitLocoDriveCommand();
-                m_SkipRequestCnt = 2;
+                preparAndTransmitLocoDriveCommand(Speed);
             }
             break;
         case pushturn:
@@ -576,13 +579,13 @@ class statePowerOn : public xmcApp
                 m_LocLib.DirectionToggle();
             }
             /* Transmit loc speed etc. data. */
-            preparAndTransmitLocoDriveCommand();
+            preparAndTransmitLocoDriveCommand(m_LocLib.SpeedGet());
             m_SkipRequestCnt = 2;
             break;
         case pushedNormal:
-            /* Change direction nad transmit loc data.. */
+            /* Change direction and transmit loc data.. */
             m_LocLib.DirectionToggle();
-            preparAndTransmitLocoDriveCommand();
+            preparAndTransmitLocoDriveCommand(m_LocLib.SpeedGet());
             m_SkipRequestCnt = 2;
             break;
         case pushedlong:
@@ -697,7 +700,7 @@ class statePowerEmergencyStop : public xmcApp
         case pushedShort: break;
         case pushedNormal:
             m_LocLib.DirectionToggle();
-            preparAndTransmitLocoDriveCommand();
+            preparAndTransmitLocoDriveCommand(m_LocLib.SpeedGet());
             m_SkipRequestCnt = 2;
             break;
         case pushedlong:
@@ -1879,7 +1882,7 @@ void xmcApp::updateLocInfoOnScreen(bool updateAll)
 /***********************************************************************************************************************
  * Prepare and transmit loco drive command
  */
-void xmcApp::preparAndTransmitLocoDriveCommand(void)
+void xmcApp::preparAndTransmitLocoDriveCommand(uint16_t SpeedSet)
 {
     uint8_t Steps = 0;
     uint8_t Speed = 0;
@@ -1888,15 +1891,15 @@ void xmcApp::preparAndTransmitLocoDriveCommand(void)
     {
     case decoderStep14:
         Steps = 0;
-        Speed = m_LocLib.SpeedGet();
+        Speed = static_cast<uint8_t>(SpeedSet);
         break;
     case decoderStep28:
         Steps = 2;
-        Speed = SpeedStep28TableToDcc[m_LocLib.SpeedGet()];
+        Speed = SpeedStep28TableToDcc[static_cast<uint8_t>(SpeedSet)];
         break;
     case decoderStep128:
         Steps = 4;
-        Speed = m_LocLib.SpeedGet();
+        Speed = SpeedSet;
         break;
     }
 
