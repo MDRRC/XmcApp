@@ -589,6 +589,10 @@ class statePowerOn : public xmcApp
             m_SkipRequestCnt = 2;
             break;
         case pushedlong:
+            m_CvPomProgramming            = true;
+            m_CvPomProgrammingFromPowerOn = true;
+            transit<stateCvProgramming>();
+            break;
         default: break;
         }
     };
@@ -704,6 +708,10 @@ class statePowerEmergencyStop : public xmcApp
             m_SkipRequestCnt = 2;
             break;
         case pushedlong:
+            m_CvPomProgramming = true;
+            transit<stateCvProgramming>();
+            break;
+
         default: break;
         }
     };
@@ -1100,7 +1108,7 @@ class stateMainMenu1 : public xmcApp
             break;
         case button_5:
             m_CvPomProgramming = true;
-            // transit<stateCvProgramming>();
+            transit<stateCvProgramming>();
             break;
         case button_power:
             m_LocSelection = true;
@@ -1625,7 +1633,7 @@ class stateCvProgramming : public xmcApp
         {
             EventCv.EventData = startPom;
             m_xmcTft.UpdateStatus("POM programming", true, WmcTft::color_green);
-            // m_z21Slave.LanSetTrackPowerOn();
+            m_XpNet.setPower(csNormal);
         }
 
         send_event(EventCv);
@@ -1749,7 +1757,10 @@ class stateCvProgramming : public xmcApp
         case cvRead: m_XpNet.readCVMode(e.CvNumber); break;
         case cvWrite: m_XpNet.writeCVMode(e.CvNumber, e.CvValue); break;
         case cvStatusRequest: m_XpNet.getresultCV(); break;
-        case pomWrite: break;
+        case pomWrite:
+            m_XpNet.writeCvPom(e.Address >> 8, e.Address, e.CvNumber - 1, e.CvValue);
+            Serial.println(e.CvValue);
+            break;
         case cvExit:
             EventCv.EventData = stop;
             send_event(EventCv);
