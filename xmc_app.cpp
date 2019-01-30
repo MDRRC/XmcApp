@@ -1757,10 +1757,7 @@ class stateCvProgramming : public xmcApp
         case cvRead: m_XpNet.readCVMode(e.CvNumber); break;
         case cvWrite: m_XpNet.writeCVMode(e.CvNumber, e.CvValue); break;
         case cvStatusRequest: m_XpNet.getresultCV(); break;
-        case pomWrite:
-            m_XpNet.writeCvPom(e.Address >> 8, e.Address, e.CvNumber - 1, e.CvValue);
-            Serial.println(e.CvValue);
-            break;
+        case pomWrite: m_XpNet.writeCvPom(e.Address >> 8, e.Address, e.CvNumber - 1, e.CvValue); break;
         case cvExit:
             EventCv.EventData = stop;
             send_event(EventCv);
