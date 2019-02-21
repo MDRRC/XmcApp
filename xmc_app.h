@@ -90,11 +90,14 @@ protected:
 
     static uint16_t m_locDbData[200];
     static uint16_t m_locDbDataCnt;
+    static uint16_t m_locDbDataTransmitCnt;
+    static uint32_t m_locDbDataTransmitDelay;
 
-    static const uint16_t ADDRESS_TURNOUT_MIN = 1;
-    static const uint16_t ADDRESS_TURNOUT_MAX = 9999;
-    static const uint8_t FUNCTION_MIN         = 0;
-    static const uint8_t FUNCTION_MAX         = 28;
+    static const uint16_t ADDRESS_TURNOUT_MIN   = 1;
+    static const uint16_t ADDRESS_TURNOUT_MAX   = 9999;
+    static const uint8_t FUNCTION_MIN           = 0;
+    static const uint8_t FUNCTION_MAX           = 28;
+    static const uint32_t LOC_DATABASE_TX_DELAY = 200;
 
     /* Conversion table for normal speed to 28 steps DCC speed. */
     const uint8_t SpeedStep28TableToDcc[29] = { 16, 2, 18, 3, 19, 4, 20, 5, 21, 6, 22, 7, 23, 8, 24, 9, 25, 10, 26, 11,

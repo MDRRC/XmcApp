@@ -39,6 +39,8 @@ locData xmcApp::m_LocDataRecievedPrevious;
 uint8_t xmcApp::m_locFunctionAssignment[5];
 uint16_t xmcApp::m_locDbData[200];
 uint16_t xmcApp::m_locDbDataCnt;
+uint16_t xmcApp::m_locDbDataTransmitCnt;
+uint32_t xmcApp::m_locDbDataTransmitDelay;
 xmcApp::powerStatus xmcApp::m_PowerStatus  = off;
 bool xmcApp::m_LocSelection                = false;
 uint8_t xmcApp::m_XpNetAddress             = 0;
@@ -77,6 +79,7 @@ class stateMenuLocAdd;
 class stateMenuLocFunctionsAdd;
 class stateMenuLocFunctionsChange;
 class stateMenuLocDelete;
+class stateMenuTransmitLocDatabase;
 class stateCommandLineInterfaceActive;
 class stateCvProgramming;
 
@@ -276,7 +279,8 @@ class stateGetPowerStatus : public xmcApp
             transit<stateProgrammingMode>();
             break;
         case cvResponse:
-        case locDataBase: break;
+        case locDataBase:
+        case locDatabaseTransmit: break;
         }
     }
 };
@@ -334,7 +338,8 @@ class stateGetLocData : public xmcApp
             }
             break;
         case cvResponse:
-        case locDataBase: break;
+        case locDataBase:
+        case locDatabaseTransmit: break;
         }
     }
 };
@@ -427,7 +432,8 @@ class statePowerOff : public xmcApp
             }
         }
         break;
-        case cvResponse: break;
+        case cvResponse:
+        case locDatabaseTransmit: break;
         }
     }
 
@@ -533,6 +539,7 @@ class statePowerOn : public xmcApp
             transit<stateProgrammingMode>();
             break;
         case locDataBase:
+        case locDatabaseTransmit:
         case cvResponse: break;
         }
     }
@@ -688,6 +695,7 @@ class statePowerEmergencyStop : public xmcApp
             transit<stateProgrammingMode>();
             break;
         case cvResponse:
+        case locDatabaseTransmit:
         case locDataBase: break;
         }
     }
@@ -782,7 +790,8 @@ class stateProgrammingMode : public xmcApp
         case locdata:
         case programmingMode:
         case cvResponse:
-        case locDataBase: break;
+        case locDataBase:
+        case locDatabaseTransmit: break;
         }
     }
 
@@ -854,7 +863,8 @@ class stateTurnoutControl : public xmcApp
             transit<stateProgrammingMode>();
             break;
         case cvResponse:
-        case locDataBase: break;
+        case locDataBase:
+        case locDatabaseTransmit: break;
         }
     }
 
@@ -1014,7 +1024,8 @@ class stateTurnoutControlPowerOff : public xmcApp
             transit<stateProgrammingMode>();
             break;
         case cvResponse:
-        case locDataBase: break;
+        case locDataBase:
+        case locDatabaseTransmit: break;
         }
     }
 
@@ -1064,11 +1075,7 @@ class stateMainMenu1 : public xmcApp
     /**
      * Show menu on screen.
      */
-    void entry() override
-    {
-        m_xmcTft.ShowMenu1();
-        m_XpNet.setPower(csTrackVoltageOff);
-    };
+    void entry() override { m_xmcTft.ShowMenu1(); };
 
     /**
      * Handle pulse switch events.
@@ -1128,11 +1135,7 @@ class stateMainMenu2 : public xmcApp
     /**
      * Show menu on screen.
      */
-    void entry() override
-    {
-        m_xmcTft.ShowMenu2(m_LocStorage.EmergencyOptionGet(), true);
-        m_XpNet.setPower(csTrackVoltageOff);
-    };
+    void entry() override { m_xmcTft.ShowMenu2(m_LocStorage.EmergencyOptionGet(), true); };
 
     /**
      * Handle pulse switch events.
@@ -1181,7 +1184,12 @@ class stateMainMenu2 : public xmcApp
                 m_xmcTft.ShowMenu2(false, false);
             }
             break;
-        case button_3: break;
+        case button_3:
+            /* Transmit loc data to control unit. This option is NOT compatible
+             * with the Roco MM !! Only for MDRCC-II
+             */
+            transit<stateMenuTransmitLocDatabase>();
+            break;
         case button_4:
             /* Erase loc info and perform reset. */
             m_xmcTft.ShowErase();
@@ -1599,6 +1607,105 @@ class stateMenuLocDelete : public xmcApp
 /***********************************************************************************************************************
  * Command lie interface active state.
  */
+class stateMenuTransmitLocDatabase : public xmcApp
+{
+    void entry() override
+    {
+        m_locDbDataTransmitCnt   = 0;
+        m_locDbDataTransmitDelay = millis();
+
+        m_xmcTft.UpdateStatus("SEND LOC DATA", true, WmcTft::color_white);
+        m_XpNet.TransmitLocDatabaseEnable();
+    }
+
+    /**
+     * Handle the XP net request.
+     */
+    void react(XpNetEvent const& e) override
+    {
+        LocLibData* LocDbData;
+
+        switch (e.dataType)
+        {
+        case none: break;
+        case powerOn:
+        case powerOff:
+            m_XpNet.TransmitLocDatabaseDisable();
+            transit<stateMainMenu2>();
+            break;
+        case powerStop:
+        case locdata:
+        case programmingMode:
+        case cvResponse:
+        case locDataBase: break;
+        case locDatabaseTransmit:
+            /* Transmit with some delay... */
+            if (millis() - m_locDbDataTransmitDelay >= LOC_DATABASE_TX_DELAY)
+            {
+                m_locDbDataTransmitDelay = millis();
+
+                // Send loc data until last loc is transmitted.
+                m_xmcTft.UpdateTransmitCount(
+                    static_cast<uint8_t>(m_locDbDataTransmitCnt), static_cast<uint8_t>(m_LocLib.GetNumberOfLocs()));
+
+                LocDbData = m_LocLib.LocGetAllDataByIndex(m_locDbDataTransmitCnt);
+                m_XpNet.TransmitLocData(LocDbData->Addres >> 8, LocDbData->Addres, m_locDbDataTransmitCnt,
+                    static_cast<uint8_t>(m_LocLib.GetNumberOfLocs()));
+                m_locDbDataTransmitCnt++;
+
+                if (m_locDbDataTransmitCnt > m_LocLib.GetNumberOfLocs())
+                {
+                    m_XpNet.TransmitLocDatabaseDisable();
+                    transit<stateMainMenu2>();
+                }
+            }
+            break;
+        }
+    }
+
+    /**
+     * Handle pulse switch events.
+     */
+    void react(pulseSwitchEvent const& e) override
+    {
+        switch (e.Status)
+        {
+        case turn:
+        case pushedNormal:
+        case pushedlong:
+            m_XpNet.TransmitLocDatabaseDisable();
+            transit<stateMainMenu2>();
+            break;
+            break;
+        default: break;
+        }
+    }
+
+    /**
+     * Handle button events, just go back to main menu on each button.
+     */
+    void react(pushButtonsEvent const& e) override
+    {
+        switch (e.Button)
+        {
+        case button_0:
+        case button_1:
+        case button_2:
+        case button_3:
+        case button_4:
+        case button_5:
+        case button_power:
+            m_XpNet.TransmitLocDatabaseDisable();
+            transit<stateMainMenu2>();
+            break;
+        case button_none: break;
+        }
+    };
+};
+
+/***********************************************************************************************************************
+ * Command lie interface active state.
+ */
 class stateCommandLineInterfaceActive : public xmcApp
 {
     /**
@@ -1654,6 +1761,7 @@ class stateCvProgramming : public xmcApp
         case powerStop:
         case locdata:
         case locDataBase:
+        case locDatabaseTransmit:
         case programmingMode: break;
         case cvResponse:
             CvResponsePtr = (cvResponseData*)(e.Data);
@@ -1763,6 +1871,7 @@ class stateCvProgramming : public xmcApp
             send_event(EventCv);
             if (m_CvPomProgrammingFromPowerOn == false)
             {
+                m_XpNet.setPower(csTrackVoltageOff);
                 transit<stateMainMenu1>();
             }
             else
@@ -1965,6 +2074,26 @@ void notifyXNetPower(uint8_t State)
     case csTrackVoltageOff: Event.dataType = powerOff; break;
     case csServiceMode: Event.dataType = programmingMode; break;
     case csEmergencyStop: Event.dataType = powerStop; break;
+    }
+
+    if (Event.dataType != none)
+    {
+        send_event(Event);
+    }
+}
+
+/***********************************************************************************************************************
+ * Callback function for generic requests from XpNet.
+ */
+void NotifyXNet(uint8_t Data)
+{
+    XpNetEvent Event;
+    Event.dataType = none;
+
+    switch (Data)
+    {
+    case csLocDataBaseSend: Event.dataType = locDatabaseTransmit; break;
+    default: break;
     }
 
     if (Event.dataType != none)

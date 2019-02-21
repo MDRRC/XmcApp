@@ -65,6 +65,7 @@ enum xpNetDataType
     locdata,
     cvResponse,
     locDataBase,
+    locDatabaseTransmit,
 };
 
 enum xpCvInfo
