@@ -211,7 +211,11 @@ class stateInitXpNet : public xmcApp
     /**
      * Init xpressnet module.
      */
-    void entry() override { m_XpNet.start(m_XpNetAddress, PB0); }
+    void entry() override
+    {
+        m_XpNet.start(m_XpNetAddress, PB0);
+        m_EmergencyStopEnabled = m_LocStorage.EmergencyOptionGet();
+    }
 
     /**
      * Next state.
