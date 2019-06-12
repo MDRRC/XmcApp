@@ -675,6 +675,9 @@ class statePowerEmergencyStop : public xmcApp
         m_LocLib.SpeedSet(0);
         m_LocDataReceived.Speed = 0;
         updateLocInfoOnScreen(false);
+
+        /* Transmit zero speed of selected loc... */
+        preparAndTransmitLocoDriveCommand(m_LocLib.SpeedGet());
     };
 
     /**
