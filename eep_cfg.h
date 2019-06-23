@@ -18,7 +18,7 @@
 class EepCfg
 {
 public:
-    static const uint8_t EepromVersion   = 2;  /* Version of data in EEPROM. */
+    static const uint8_t EepromVersion   = 3;  /* Version of data in EEPROM. */
     static const uint32_t EepromPageSize = 64; /* 24LC256 page size. */
 
     static const int EepromVersionAddress         = 0;  /* EEPROM address version info. */

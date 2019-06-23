@@ -1381,7 +1381,7 @@ class stateMenuLocFunctionsAdd : public xmcApp
         case pushedNormal:
             /* Store loc functions */
             m_xmcTft.UpdateStatus("SORTING  ", false, WmcTft::color_white);
-            m_LocLib.StoreLoc(m_locAddressAdd, m_locFunctionAssignment, LocLib::storeAdd);
+            m_LocLib.StoreLoc(m_locAddressAdd, m_locFunctionAssignment, NULL, LocLib::storeAdd);
             m_LocLib.LocBubbleSort();
             m_locAddressAdd++;
             transit<stateMenuLocAdd>();
@@ -1419,7 +1419,7 @@ class stateMenuLocFunctionsAdd : public xmcApp
         case button_5:
             /* Store loc functions */
             m_xmcTft.UpdateStatus("SORTING  ", false, WmcTft::color_white);
-            m_LocLib.StoreLoc(m_locAddressAdd, m_locFunctionAssignment, LocLib::storeAdd);
+            m_LocLib.StoreLoc(m_locAddressAdd, m_locFunctionAssignment, NULL, LocLib::storeAdd);
             m_LocLib.LocBubbleSort();
             m_locAddressAdd++;
             transit<stateMenuLocAdd>();
@@ -1506,7 +1506,7 @@ class stateMenuLocFunctionsChange : public xmcApp
         case pushedNormal:
         case pushedlong:
             /* Store changed data and yellow text indicating data is stored. */
-            m_LocLib.StoreLoc(m_locAddressChange, m_locFunctionAssignment, LocLib::storeChange);
+            m_LocLib.StoreLoc(m_locAddressChange, m_locFunctionAssignment, NULL, LocLib::storeChange);
             m_xmcTft.ShowlocAddress(m_locAddressChange, WmcTft::color_yellow);
             break;
         default: break;
@@ -1541,7 +1541,7 @@ class stateMenuLocFunctionsChange : public xmcApp
         case button_power: transit<stateMainMenu1>(); break;
         case button_5:
             /* Store changed data and yellow text indicating data is stored. */
-            m_LocLib.StoreLoc(m_locAddressChange, m_locFunctionAssignment, LocLib::storeChange);
+            m_LocLib.StoreLoc(m_locAddressChange, m_locFunctionAssignment, NULL, LocLib::storeChange);
             m_xmcTft.ShowlocAddress(m_locAddressChange, WmcTft::color_yellow);
             break;
         case button_none: break;
@@ -1997,7 +1997,8 @@ void xmcApp::updateLocInfoOnScreen(bool updateAll)
         // Convert data for display.
         convertLocDataToDisplayData(&m_LocDataReceived, &locInfoActual);
         convertLocDataToDisplayData(&m_LocDataRecievedPrevious, &locInfoPrevious);
-        m_xmcTft.UpdateLocInfo(&locInfoActual, &locInfoPrevious, m_locFunctionAssignment, updateAll);
+        m_xmcTft.UpdateLocInfo(
+            &locInfoActual, &locInfoPrevious, m_locFunctionAssignment, m_LocLib.GetLocName(), updateAll);
 
         memcpy(&m_LocDataRecievedPrevious, &m_LocDataReceived, sizeof(locData));
     }
@@ -2054,7 +2055,7 @@ void xmcApp::StoreAndSortLocDatabaseData(void)
         /* If loc not in data base add it... */
         if (m_LocLib.CheckLoc(m_locDbData[Index]) == 255)
         {
-            m_LocLib.StoreLoc(m_locDbData[Index], locFunctionAssignment, LocLib::storeAddNoAutoSelect);
+            m_LocLib.StoreLoc(m_locDbData[Index], locFunctionAssignment, NULL, LocLib::storeAddNoAutoSelect);
 
             /* Show increasing counter. */
             m_xmcTft.UpdateSelectedAndNumberOfLocs(m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
