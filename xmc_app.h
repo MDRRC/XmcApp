@@ -89,6 +89,7 @@ protected:
     static uint8_t m_locFunctionChange;
 
     static uint16_t m_locDbData[200];
+    static char m_locDbDataName[200][11];
     static uint16_t m_locDbDataCnt;
     static uint16_t m_locDbDataTransmitCnt;
     static uint32_t m_locDbDataTransmitDelay;

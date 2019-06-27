@@ -38,6 +38,7 @@ WmcTft::locoInfo xmcApp::locInfoPrevious;
 locData xmcApp::m_LocDataRecievedPrevious;
 uint8_t xmcApp::m_locFunctionAssignment[5];
 uint16_t xmcApp::m_locDbData[200];
+char xmcApp::m_locDbDataName[200][11];
 uint16_t xmcApp::m_locDbDataCnt;
 uint16_t xmcApp::m_locDbDataTransmitCnt;
 uint32_t xmcApp::m_locDbDataTransmitDelay;
@@ -423,16 +424,38 @@ class statePowerOff : public xmcApp
             {
                 m_locDbDataCnt = 0;
                 m_xmcTft.UpdateStatus("RECEIVING", false, WmcTft::color_white);
-            }
 
-            /* Add received loc address */
-            m_locDbData[m_locDbDataCnt] = locDatabasePtr->Address;
-            m_locDbDataCnt++;
+                // Copy initial loc data.
+                m_locDbData[m_locDbDataCnt] = locDatabasePtr->Address;
+                memset(&m_locDbDataName[m_locDbDataCnt][0], '\0', 11);
+                memcpy(&m_locDbDataName[m_locDbDataCnt][0], locDatabasePtr->NameStr, 11 - 1);
+
+                /* Update status row indicating something is happening. */
+                m_xmcTft.UpdateSelectedAndNumberOfLocs(1, m_locDbDataCnt + 1);
+            }
+            else
+            {
+                /* XpressNet sends loc database data twice, only store one of both identical messages.*/
+                if (m_locDbData[m_locDbDataCnt] != locDatabasePtr->Address)
+                {
+                    /* Add received loc address */
+                    m_locDbDataCnt++;
+                    m_locDbData[m_locDbDataCnt] = locDatabasePtr->Address;
+                    memset(&m_locDbDataName[m_locDbDataCnt][0], '\0', 11);
+                    memcpy(&m_locDbDataName[m_locDbDataCnt][0], locDatabasePtr->NameStr, 11 - 1);
+
+                    /* Update status row indicating something is happening. */
+                    m_xmcTft.UpdateSelectedAndNumberOfLocs(1, m_locDbDataCnt + 1);
+                }
+            }
 
             /* All received? Store and sort data. */
             if ((locDatabasePtr->Number + 1) == locDatabasePtr->Total)
             {
                 StoreAndSortLocDatabaseData();
+
+                /* Reset so new loc data can be used. */
+                nvic_sys_reset();
             }
         }
         break;
@@ -2055,7 +2078,8 @@ void xmcApp::StoreAndSortLocDatabaseData(void)
         /* If loc not in data base add it... */
         if (m_LocLib.CheckLoc(m_locDbData[Index]) == 255)
         {
-            m_LocLib.StoreLoc(m_locDbData[Index], locFunctionAssignment, NULL, LocLib::storeAddNoAutoSelect);
+            m_LocLib.StoreLoc(
+                m_locDbData[Index], locFunctionAssignment, &m_locDbDataName[Index][0], LocLib::storeAddNoAutoSelect);
 
             /* Show increasing counter. */
             m_xmcTft.UpdateSelectedAndNumberOfLocs(m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
@@ -2176,7 +2200,6 @@ void notifyLokDataBaseDataReceive(
     uint8_t Adr_High, uint8_t Adr_Low, uint8_t LocCount, uint8_t NumberOfLocs, char* LocName)
 {
     XpNetEvent Event;
-    LocName = LocName;
 
     locDatabaseData* LocDatabaseDataPtr = (locDatabaseData*)(Event.Data);
     Event.dataType                      = locDataBase;
@@ -2185,6 +2208,7 @@ void notifyLokDataBaseDataReceive(
     LocDatabaseDataPtr->Address |= (uint16)(Adr_Low);
     LocDatabaseDataPtr->Number = LocCount;
     LocDatabaseDataPtr->Total  = NumberOfLocs;
+    memcpy(LocDatabaseDataPtr->NameStr, LocName, 10);
 
     send_event(Event);
 }
