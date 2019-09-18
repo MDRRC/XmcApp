@@ -1635,7 +1635,7 @@ class stateMenuLocDelete : public xmcApp
 };
 
 /***********************************************************************************************************************
- * Command lie interface active state.
+ * Transmit loc data on XpressNet
  */
 class stateMenuTransmitLocDatabase : public xmcApp
 {
@@ -1734,7 +1734,7 @@ class stateMenuTransmitLocDatabase : public xmcApp
 };
 
 /***********************************************************************************************************************
- * Command lie interface active state.
+ * Command line interface active state.
  */
 class stateCommandLineInterfaceActive : public xmcApp
 {
@@ -1764,12 +1764,12 @@ class stateCvProgramming : public xmcApp
         if (m_CvPomProgramming == false)
         {
             EventCv.EventData = startCv;
-            m_xmcTft.UpdateStatus("CV programming", true, WmcTft::color_green);
+            m_xmcTft.UpdateStatus("CV PROGRAMMING", true, WmcTft::color_green);
         }
         else
         {
             EventCv.EventData = startPom;
-            m_xmcTft.UpdateStatus("POM programming", true, WmcTft::color_green);
+            m_xmcTft.UpdateStatus("POM PROGRAMMING", true, WmcTft::color_green);
             m_XpNet.setPower(csNormal);
         }
 
@@ -2089,7 +2089,7 @@ void xmcApp::StoreAndSortLocDatabaseData(void)
     /* If all added sort... */
     m_xmcTft.UpdateStatus("SORTING  ", false, WmcTft::color_white);
     m_LocLib.LocBubbleSort();
-    m_xmcTft.UpdateStatus("POWER OFF", false, WmcTft::color_red);
+    m_xmcTft.UpdateStatus("RESET....", false, WmcTft::color_red);
 }
 
 /***********************************************************************************************************************
