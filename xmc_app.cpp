@@ -790,7 +790,7 @@ class statePowerEmergencyStop : public xmcApp
 };
 
 /***********************************************************************************************************************
- * External cv programmng active byu another device.
+ * External cv programmng active by another device.
  */
 class stateProgrammingMode : public xmcApp
 {
@@ -1852,7 +1852,6 @@ class stateCvProgramming : public xmcApp
     void react(pushButtonsEvent const& e) override
     {
         cvpushButtonEvent Event;
-        cvEvent EventCv;
 
         /* Handle menu request. */
         switch (e.Button)
@@ -1863,21 +1862,10 @@ class stateCvProgramming : public xmcApp
         case button_3:
         case button_4:
         case button_5:
+        case button_power:
             /* Forward event.*/
             Event.EventData.Button = e.Button;
             send_event(Event);
-            break;
-        case button_power:
-            EventCv.EventData = stop;
-            send_event(EventCv);
-            if (m_CvPomProgrammingFromPowerOn == false)
-            {
-                transit<stateMainMenu1>();
-            }
-            else
-            {
-                transit<stateGetLocData>();
-            }
             break;
         case button_none: break;
         }
@@ -1888,8 +1876,6 @@ class stateCvProgramming : public xmcApp
      */
     void react(cvProgEvent const& e) override
     {
-        cvEvent EventCv;
-
         switch (e.Request)
         {
         case cvRead: m_XpNet.readCVMode(e.CvNumber); break;
@@ -1897,8 +1883,6 @@ class stateCvProgramming : public xmcApp
         case cvStatusRequest: m_XpNet.getresultCV(); break;
         case pomWrite: m_XpNet.writeCvPom(e.Address >> 8, e.Address, e.CvNumber - 1, e.CvValue); break;
         case cvExit:
-            EventCv.EventData = stop;
-            send_event(EventCv);
             if (m_CvPomProgrammingFromPowerOn == false)
             {
                 m_XpNet.setPower(csTrackVoltageOff);
