@@ -944,7 +944,7 @@ class stateTurnoutControl : public xmcApp
         case pushedNormal:
         case pushedlong:
             /* Back to loc control. */
-            transit<stateGetLocData>();
+            transit<stateGetPowerStatus>();
             break;
         default: break;
         }
@@ -1764,12 +1764,10 @@ class stateCvProgramming : public xmcApp
         if (m_CvPomProgramming == false)
         {
             EventCv.EventData = startCv;
-            m_xmcTft.UpdateStatus("CV PROGRAMMING", true, WmcTft::color_green);
         }
         else
         {
             EventCv.EventData = startPom;
-            m_xmcTft.UpdateStatus("POM PROGRAMMING", true, WmcTft::color_green);
             m_XpNet.setPower(csNormal);
         }
 
