@@ -654,7 +654,7 @@ class statePowerOn : public xmcApp
         case button_2:
         case button_3:
         case button_4:
-            /* Get the assinged function to the button, toggle function and transmit data.*/
+            /* Get the assigned function to the button, toggle function and transmit data.*/
             Function = m_LocLib.FunctionAssignedGet(static_cast<uint8_t>(e.Button));
             m_LocLib.FunctionToggle(Function);
 
