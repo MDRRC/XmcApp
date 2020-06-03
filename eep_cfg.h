@@ -26,6 +26,7 @@ public:
     static const int XpNetAddress                 = 4;  /* EEPROM address of Xpnet address */
     static const int EmergencyStopEnabledAddress  = 6;  /* EEPROM address for emergency option. */
     static const int locLibEepromAddressNumOfLocs = 8;  /* EEPROM address number of locs. */
+    static const int SelectedLocAddress           = 10; /* EEPROM address for storage last selected loc. */
     static const int locLibEepromAddressLocData   = 64; /* EEPROM address number of locs. */
 };
 #endif
