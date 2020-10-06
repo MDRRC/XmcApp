@@ -1606,7 +1606,9 @@ class stateMenuLocDelete : public xmcApp
         case pushedNormal:
         case pushedlong:
             /* Remove loc. */
+            m_xmcTft.UpdateStatus("DELETING", true, WmcTft::color_red);
             m_LocLib.RemoveLoc(m_locAddressDelete);
+            m_xmcTft.UpdateStatus("DELETE", true, WmcTft::color_green);
             m_xmcTft.UpdateSelectedAndNumberOfLocs(m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
             m_locAddressDelete = m_LocLib.GetActualLocAddress();
             m_xmcTft.ShowlocAddress(m_locAddressDelete, WmcTft::color_green);
