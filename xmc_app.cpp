@@ -1553,7 +1553,7 @@ class stateMenuLocFunctionsChange : public xmcApp
         case button_2:
         case button_3:
         case button_4:
-            /* Rest of buttons for oher functions except light. */
+            /* Rest of buttons for other functions except light. */
             if (m_locFunctionChange != 0)
             {
                 m_locFunctionAssignment[static_cast<uint8_t>(e.Button)] = m_locFunctionChange;
@@ -1612,6 +1612,7 @@ class stateMenuLocDelete : public xmcApp
             m_xmcTft.UpdateSelectedAndNumberOfLocs(m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
             m_locAddressDelete = m_LocLib.GetActualLocAddress();
             m_xmcTft.ShowlocAddress(m_locAddressDelete, WmcTft::color_green);
+
             break;
         default: break;
         }
