@@ -1595,6 +1595,8 @@ class stateMenuLocDelete : public xmcApp
      */
     void react(pulseSwitchEvent const& e) override
     {
+        uint16_t LocAddresActual = 0;
+
         switch (e.Status)
         {
         case turn:
@@ -1606,13 +1608,30 @@ class stateMenuLocDelete : public xmcApp
         case pushedNormal:
         case pushedlong:
             /* Remove loc. */
-            m_xmcTft.UpdateStatus("DELETING", true, WmcTft::color_red);
-            m_LocLib.RemoveLoc(m_locAddressDelete);
-            m_xmcTft.UpdateStatus("DELETE", true, WmcTft::color_green);
-            m_xmcTft.UpdateSelectedAndNumberOfLocs(m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
-            m_locAddressDelete = m_LocLib.GetActualLocAddress();
-            m_xmcTft.ShowlocAddress(m_locAddressDelete, WmcTft::color_green);
+            LocAddresActual = m_LocLib.GetActualLocAddress();
 
+            // Only delete when at least two locs are present.
+            if (m_LocLib.GetNumberOfLocs() > 1)
+            {
+                m_xmcTft.UpdateStatus("DELETING", true, WmcTft::color_red);
+                m_LocLib.RemoveLoc(m_locAddressDelete);
+                m_xmcTft.UpdateStatus("DELETE", true, WmcTft::color_green);
+                m_xmcTft.UpdateSelectedAndNumberOfLocs(
+                    m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
+
+                // In case the selected loc was the same as the active controlled loc update last selected loc entry.
+                if (m_locAddressDelete == LocAddresActual)
+                {
+                    m_locAddressDelete = m_LocLib.GetActualLocAddress();
+                    m_LocStorage.SelectedLocIndexStore(m_LocLib.GetActualSelectedLocIndex() - 1);
+                }
+                else
+                {
+                    m_locAddressDelete = m_LocLib.GetActualLocAddress();
+                }
+            }
+
+            m_xmcTft.ShowlocAddress(m_locAddressDelete, WmcTft::color_green);
             break;
         default: break;
         }
