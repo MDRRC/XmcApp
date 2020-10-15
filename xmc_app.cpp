@@ -106,11 +106,11 @@ class stateInit : public xmcApp
     /**
      * 3 Seconds timeout
      */
-    void react(updateEvent3sec const&) override
+    void react(updateEvent500msec const&) override
     {
         /* Some delay so app name is displayed after power on. */
         m_ConnectCount++;
-        if (m_ConnectCount > 1)
+        if (m_ConnectCount >= 2)
         {
             m_XpNetAddress = m_LocStorage.XpNetAddressGet();
 
