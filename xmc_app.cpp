@@ -1531,6 +1531,11 @@ class stateMenuLocFunctionsChange : public xmcApp
             /* Store changed data and yellow text indicating data is stored. */
             m_LocLib.StoreLoc(m_locAddressChange, m_locFunctionAssignment, NULL, LocLib::storeChange);
             m_xmcTft.ShowlocAddress(m_locAddressChange, WmcTft::color_yellow);
+
+            /* Update loc data after changes are stored. LocSelection variable is misused to
+               update new selected function on the screen.*/
+            m_LocSelection = true;
+            m_LocLib.UpdateLocData(m_LocLib.GetActualLocAddress());
             break;
         default: break;
         }
@@ -1561,7 +1566,10 @@ class stateMenuLocFunctionsChange : public xmcApp
                     static_cast<uint8_t>(e.Button), m_locFunctionAssignment[static_cast<uint8_t>(e.Button)]);
             }
             break;
-        case button_power: transit<stateMainMenu1>(); break;
+        case button_power:
+            transit<stateMainMenu1>();
+            m_LocDataRecievedPrevious.Functions = 0;
+            break;
         case button_5:
             /* Store changed data and yellow text indicating data is stored. */
             m_LocLib.StoreLoc(m_locAddressChange, m_locFunctionAssignment, NULL, LocLib::storeChange);
@@ -1987,7 +1995,7 @@ void xmcApp::updateLocInfoOnScreen(bool updateAll)
     {
         m_LocLib.SpeedUpdate(m_LocDataReceived.Speed);
 
-        // Convert speed.
+        /* Convert speed. */
         switch (m_LocDataReceived.Direction)
         {
         case 0: m_LocLib.DirectionSet(directionBackWard); break;
@@ -1995,10 +2003,10 @@ void xmcApp::updateLocInfoOnScreen(bool updateAll)
         default: m_LocLib.DirectionSet(directionForward); break;
         }
 
-        // Set function data.
+        /* Set function data. */
         m_LocLib.FunctionUpdate(m_LocDataReceived.Functions);
 
-        // Convert decoder steps.
+        /* Convert decoder steps. */
         switch (m_LocDataReceived.Steps)
         {
         case 0: m_LocLib.DecoderStepsUpdate(decoderStep14); break;
@@ -2007,7 +2015,7 @@ void xmcApp::updateLocInfoOnScreen(bool updateAll)
         default: m_LocLib.DecoderStepsUpdate(decoderStep28); break;
         }
 
-        // Get function assignment of loc.
+        /* Get function assignment of loc. */
         for (Index = 0; Index < 5; Index++)
         {
             m_locFunctionAssignment[Index] = m_LocLib.FunctionAssignedGet(Index);
@@ -2021,7 +2029,7 @@ void xmcApp::updateLocInfoOnScreen(bool updateAll)
             m_LocSelection                      = false;
         }
 
-        // Convert data for display.
+        /* Convert data for display. */
         convertLocDataToDisplayData(&m_LocDataReceived, &locInfoActual);
         convertLocDataToDisplayData(&m_LocDataRecievedPrevious, &locInfoPrevious);
         m_xmcTft.UpdateLocInfo(
