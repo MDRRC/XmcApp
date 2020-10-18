@@ -84,6 +84,7 @@ protected:
     static bool m_EmergencyStopEnabled;
     static uint16_t m_locAddressAdd;
     static uint16_t m_locAddressChange;
+    static uint16_t m_LocAddressChangeActive;
     static uint16_t m_locAddressDelete;
     static uint8_t m_locFunctionAdd;
     static uint8_t m_locFunctionChange;

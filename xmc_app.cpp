@@ -55,6 +55,7 @@ bool xmcApp::m_CvPomProgramming            = false;
 bool xmcApp::m_EmergencyStopEnabled        = false;
 uint16_t xmcApp::m_locAddressAdd           = 1;
 uint16_t xmcApp::m_locAddressChange        = 1;
+uint16_t xmcApp::m_LocAddressChangeActive  = 1;
 uint16_t xmcApp::m_locAddressDelete        = 1;
 uint8_t xmcApp::m_locFunctionAdd           = 0;
 uint8_t xmcApp::m_locFunctionChange        = 0;
@@ -1465,8 +1466,9 @@ class stateMenuLocFunctionsChange : public xmcApp
         uint8_t Index;
 
         m_xmcTft.Clear();
-        m_locFunctionChange = 0;
-        m_locAddressChange  = m_LocLib.GetActualLocAddress();
+        m_locFunctionChange      = 0;
+        m_locAddressChange       = m_LocLib.GetActualLocAddress();
+        m_LocAddressChangeActive = m_locAddressChange;
         m_xmcTft.UpdateStatus("CHANGE FUNC", true, WmcTft::color_green);
         m_xmcTft.ShowLocSymbolFw(WmcTft::color_white);
         m_xmcTft.ShowlocAddress(m_locAddressChange, WmcTft::color_green);
@@ -1532,10 +1534,9 @@ class stateMenuLocFunctionsChange : public xmcApp
             m_LocLib.StoreLoc(m_locAddressChange, m_locFunctionAssignment, NULL, LocLib::storeChange);
             m_xmcTft.ShowlocAddress(m_locAddressChange, WmcTft::color_yellow);
 
-            /* Update loc data after changes are stored. LocSelection variable is misused to
-               update new selected function on the screen.*/
+            /* Update data. Misuse locselection variable to force update when loc screen is redrawn. */
             m_LocSelection = true;
-            m_LocLib.UpdateLocData(m_LocLib.GetActualLocAddress());
+            m_LocLib.UpdateLocData(m_locAddressChange);
             break;
         default: break;
         }
@@ -1567,8 +1568,14 @@ class stateMenuLocFunctionsChange : public xmcApp
             }
             break;
         case button_power:
+            /* If loc where functions are changed is unequal to active controlled loc set active controlled loc.
+               Misuse LocSelection to force screen update of active selected loc. */
+            if (m_LocAddressChangeActive != m_locAddressChange)
+            {
+                m_LocSelection = true;
+                m_LocLib.UpdateLocData(m_LocAddressChangeActive);
+            }
             transit<stateMainMenu1>();
-            m_LocDataRecievedPrevious.Functions = 0;
             break;
         case button_5:
             /* Store changed data and yellow text indicating data is stored. */
