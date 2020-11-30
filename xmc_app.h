@@ -59,6 +59,7 @@ public:
     void updateLocInfoOnScreen(bool updateAll);
     void preparAndTransmitLocoDriveCommand(uint16_t SpeedSet);
     void StoreAndSortLocDatabaseData(void);
+    int8_t CheckPulseSwitchRevert(int8_t Delta);
 
 protected:
     static WmcTft m_xmcTft;
@@ -88,6 +89,7 @@ protected:
     static uint16_t m_locAddressDelete;
     static uint8_t m_locFunctionAdd;
     static uint8_t m_locFunctionChange;
+    static bool m_PulseSwitchInvert;
 
     static uint16_t m_locDbData[200];
     static char m_locDbDataName[200][11];

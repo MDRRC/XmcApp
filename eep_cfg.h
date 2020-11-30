@@ -27,6 +27,7 @@ public:
     static const int EmergencyStopEnabledAddress  = 6;  /* EEPROM address for emergency option. */
     static const int locLibEepromAddressNumOfLocs = 8;  /* EEPROM address number of locs. */
     static const int SelectedLocAddress           = 10; /* EEPROM address for storage last selected loc. */
+    static const int PulseSwitchInvertAddress     = 12; /* EEPROM address inverted behavior pulse switch. */
     static const int locLibEepromAddressLocData   = 64; /* EEPROM address number of locs. */
 };
 #endif

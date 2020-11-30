@@ -59,6 +59,7 @@ uint16_t xmcApp::m_LocAddressChangeActive  = 1;
 uint16_t xmcApp::m_locAddressDelete        = 1;
 uint8_t xmcApp::m_locFunctionAdd           = 0;
 uint8_t xmcApp::m_locFunctionChange        = 0;
+bool xmcApp::m_PulseSwitchInvert           = false;
 
 /***********************************************************************************************************************
   F U N C T I O N S
@@ -155,7 +156,7 @@ class stateCheckXpNetAddress : public xmcApp
         {
         case turn:
         case pushturn:
-            if (e.Delta > 0)
+            if (CheckPulseSwitchRevert(e.Delta) > 0)
             {
                 /* Increase XpNet device address. Roll over when required. */
                 if (m_XpNetAddress < 31)
@@ -169,7 +170,7 @@ class stateCheckXpNetAddress : public xmcApp
 
                 m_xmcTft.ShowXpNetAddress(m_XpNetAddress);
             }
-            else if (e.Delta < 0)
+            else if (CheckPulseSwitchRevert(e.Delta) < 0)
             {
                 /* Decrease XpNet device address. Roll over when required. */
                 if (m_XpNetAddress > 1)
@@ -216,6 +217,7 @@ class stateInitXpNet : public xmcApp
     void entry() override
     {
         m_XpNet.start(m_XpNetAddress, PB0);
+        m_PulseSwitchInvert    = m_LocStorage.PulseSwitchInvertGet();
         m_EmergencyStopEnabled = m_LocStorage.EmergencyOptionGet();
     }
 
@@ -474,9 +476,9 @@ class statePowerOff : public xmcApp
         {
         case pushturn:
             /* Select next or previous loc. */
-            if (e.Delta != 0)
+            if (CheckPulseSwitchRevert(e.Delta) != 0)
             {
-                m_LocLib.GetNextLoc(e.Delta);
+                m_LocLib.GetNextLoc(CheckPulseSwitchRevert(e.Delta));
                 m_XpNet.getLocoInfo(
                     (uint8_t)(m_LocLib.GetActualLocAddress() >> 8), (uint8_t)(m_LocLib.GetActualLocAddress()));
                 m_xmcTft.UpdateSelectedAndNumberOfLocs(
@@ -582,7 +584,7 @@ class statePowerOn : public xmcApp
         switch (e.Status)
         {
         case turn:
-            Speed = m_LocLib.SpeedSet(e.Delta);
+            Speed = m_LocLib.SpeedSet(CheckPulseSwitchRevert(e.Delta));
             if (Speed != 0xFFFF)
             {
                 // Transmit loc speed etc. data.
@@ -591,9 +593,9 @@ class statePowerOn : public xmcApp
             break;
         case pushturn:
             /* Select next or previous loc. */
-            if (e.Delta != 0)
+            if (CheckPulseSwitchRevert(e.Delta) != 0)
             {
-                m_LocLib.GetNextLoc(e.Delta);
+                m_LocLib.GetNextLoc(CheckPulseSwitchRevert(e.Delta));
                 m_XpNet.getLocoInfo(
                     (uint8_t)(m_LocLib.GetActualLocAddress() >> 8), (uint8_t)(m_LocLib.GetActualLocAddress()));
                 m_xmcTft.UpdateSelectedAndNumberOfLocs(
@@ -909,7 +911,7 @@ class stateTurnoutControl : public xmcApp
         {
         case pushturn: break;
         case turn:
-            if (e.Delta > 0)
+            if (CheckPulseSwitchRevert(e.Delta) > 0)
             {
                 /* Increase address and check for overrrun. */
                 if (m_TurnOutAddress < ADDRESS_TURNOUT_MAX)
@@ -923,7 +925,7 @@ class stateTurnoutControl : public xmcApp
 
                 updateScreen = true;
             }
-            else if (e.Delta < 0)
+            else if (CheckPulseSwitchRevert(e.Delta) < 0)
             {
                 /* Decrease address and handle address 0. */
                 if (m_TurnOutAddress > ADDRESS_TURNOUT_MIN)
@@ -1275,13 +1277,13 @@ class stateMenuLocAdd : public xmcApp
         {
         case turn:
             /* Increase or decrease loc address to be added. */
-            if (e.Delta > 0)
+            if (CheckPulseSwitchRevert(e.Delta) > 0)
             {
                 m_locAddressAdd++;
                 m_locAddressAdd = m_LocLib.limitLocAddress(m_locAddressAdd);
                 m_xmcTft.ShowlocAddress(m_locAddressAdd, WmcTft::color_green);
             }
-            else if (e.Delta < 0)
+            else if (CheckPulseSwitchRevert(e.Delta) < 0)
             {
                 m_locAddressAdd--;
                 m_locAddressAdd = m_LocLib.limitLocAddress(m_locAddressAdd);
@@ -1380,7 +1382,7 @@ class stateMenuLocFunctionsAdd : public xmcApp
         {
         case turn:
             /* ncrease of decrease the function. */
-            if (e.Delta > 0)
+            if (CheckPulseSwitchRevert(e.Delta) > 0)
             {
                 m_locFunctionAdd++;
                 if (m_locFunctionAdd > FUNCTION_MAX)
@@ -1389,7 +1391,7 @@ class stateMenuLocFunctionsAdd : public xmcApp
                 }
                 m_xmcTft.FunctionAddUpdate(m_locFunctionAdd);
             }
-            else if (e.Delta < 0)
+            else if (CheckPulseSwitchRevert(e.Delta) < 0)
             {
                 if (m_locFunctionAdd == FUNCTION_MIN)
                 {
@@ -1493,7 +1495,7 @@ class stateMenuLocFunctionsChange : public xmcApp
         {
         case turn:
             /* Change function. */
-            if (e.Delta > 0)
+            if (CheckPulseSwitchRevert(e.Delta) > 0)
             {
                 m_locFunctionChange++;
                 if (m_locFunctionChange > FUNCTION_MAX)
@@ -1502,7 +1504,7 @@ class stateMenuLocFunctionsChange : public xmcApp
                 }
                 m_xmcTft.FunctionAddUpdate(m_locFunctionChange);
             }
-            else if (e.Delta < 0)
+            else if (CheckPulseSwitchRevert(e.Delta) < 0)
             {
                 if (m_locFunctionChange == FUNCTION_MIN)
                 {
@@ -1517,7 +1519,7 @@ class stateMenuLocFunctionsChange : public xmcApp
             break;
         case pushturn:
             /* Select another loc and update function data of newly selected loc. */
-            m_locAddressChange = m_LocLib.GetNextLoc(e.Delta);
+            m_locAddressChange = m_LocLib.GetNextLoc(CheckPulseSwitchRevert(e.Delta));
             m_xmcTft.UpdateSelectedAndNumberOfLocs(m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
 
             for (Index = 0; Index < 5; Index++)
@@ -1616,7 +1618,7 @@ class stateMenuLocDelete : public xmcApp
         {
         case turn:
             /* Select loc to be deleted. */
-            m_locAddressDelete = m_LocLib.GetNextLoc(e.Delta);
+            m_locAddressDelete = m_LocLib.GetNextLoc(CheckPulseSwitchRevert(e.Delta));
             m_xmcTft.UpdateSelectedAndNumberOfLocs(m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
             m_xmcTft.ShowlocAddress(m_locAddressDelete, WmcTft::color_green);
             break;
@@ -1866,7 +1868,7 @@ class stateCvProgramming : public xmcApp
         case pushedShort:
         case pushedNormal:
             /* Forward event */
-            Event.EventData.Delta  = e.Delta;
+            Event.EventData.Delta  = CheckPulseSwitchRevert(e.Delta);
             Event.EventData.Status = e.Status;
             send_event(Event);
             break;
@@ -2285,4 +2287,22 @@ void notifyCVResult(uint8_t cvAdr, uint8_t cvData)
     CvDataPtr->cvInfo   = dataReady;
 
     send_event(Event);
+}
+
+/***********************************************************************************************************************
+ * Invert the pulse switch delate value if required.
+ */
+int8_t xmcApp::CheckPulseSwitchRevert(int8_t Delta)
+{
+    int8_t DeltaResult = Delta;
+
+    if (DeltaResult != 0)
+    {
+        if (m_PulseSwitchInvert == true)
+        {
+            DeltaResult *= -1;
+        }
+    }
+
+    return (DeltaResult);
 }
