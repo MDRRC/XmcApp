@@ -71,6 +71,7 @@ protected:
     static uint8_t m_ConnectCount;
     static powerStatus m_PowerStatus;
     static bool m_LocSelection;
+    static bool m_PushButtonReleased;
     static locData m_LocDataReceived;
     static locData m_LocDataRecievedPrevious;
     static uint8_t m_locFunctionAssignment[5];

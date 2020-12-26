@@ -44,6 +44,7 @@ uint16_t xmcApp::m_locDbDataTransmitCnt;
 uint32_t xmcApp::m_locDbDataTransmitDelay;
 xmcApp::powerStatus xmcApp::m_PowerStatus  = off;
 bool xmcApp::m_LocSelection                = false;
+bool xmcApp::m_PushButtonReleased          = false;
 uint8_t xmcApp::m_XpNetAddress             = 0;
 uint8_t xmcApp::m_ConnectCount             = 0;
 uint8_t xmcApp::m_SkipRequestCnt           = 0;
@@ -192,7 +193,8 @@ class stateCheckXpNetAddress : public xmcApp
             m_xmcTft.Clear();
             nvic_sys_reset();
             break;
-        case pushedShort: break;
+        case pushedShort:
+        case released: break;
         }
     }
 
@@ -363,6 +365,7 @@ class statePowerOff : public xmcApp
     {
         m_PowerStatus  = powerStatus::off;
         m_locDbDataCnt = 0;
+        m_LocSelection = false;
         m_xmcTft.UpdateStatus("POWER OFF", false, WmcTft::color_red);
         m_xmcTft.UpdateSelectedAndNumberOfLocs(m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
 
@@ -378,7 +381,7 @@ class statePowerOff : public xmcApp
      */
     void react(updateEvent500msec const&) override
     {
-        // If command transmitetd wait a little...
+        // If command transmitted wait a little...
         if (m_SkipRequestCnt > 0)
         {
             m_SkipRequestCnt--;
@@ -386,8 +389,11 @@ class statePowerOff : public xmcApp
         else
         {
             m_SkipRequestCnt = 2;
-            m_XpNet.getLocoInfo(
-                (uint8_t)(m_LocLib.GetActualLocAddress() >> 8), (uint8_t)(m_LocLib.GetActualLocAddress()));
+            if (m_LocSelection == false)
+            {
+                m_XpNet.getLocoInfo(
+                    (uint8_t)(m_LocLib.GetActualLocAddress() >> 8), (uint8_t)(m_LocLib.GetActualLocAddress()));
+            }
         }
     }
 
@@ -407,12 +413,16 @@ class statePowerOff : public xmcApp
 
         case powerStop: break;
         case locdata:
-            LocDataPtr = (locData*)(e.Data);
+            // Only update when not selecting a loc.
+            if ((m_LocSelection == false) || (m_PushButtonReleased = false))
+            {
+                LocDataPtr = (locData*)(e.Data);
 
-            /* Roco Multimaus keeps transmitting set speed... Force zero speed. */
-            LocDataPtr->Speed = 0;
-            memcpy(&m_LocDataReceived, LocDataPtr, sizeof(locData));
-            updateLocInfoOnScreen(false);
+                /* Roco Multimaus keeps transmitting set speed... Force zero speed. */
+                LocDataPtr->Speed = 0;
+                memcpy(&m_LocDataReceived, LocDataPtr, sizeof(locData));
+                updateLocInfoOnScreen(false);
+            }
             break;
         case programmingMode:
             m_PowerStatus = powerStatus::progMode;
@@ -478,13 +488,11 @@ class statePowerOff : public xmcApp
             /* Select next or previous loc. */
             if (CheckPulseSwitchRevert(e.Delta) != 0)
             {
-                m_LocLib.GetNextLoc(CheckPulseSwitchRevert(e.Delta));
-                m_XpNet.getLocoInfo(
-                    (uint8_t)(m_LocLib.GetActualLocAddress() >> 8), (uint8_t)(m_LocLib.GetActualLocAddress()));
+                m_LocLib.GetNextLoc(CheckPulseSwitchRevert(CheckPulseSwitchRevert(e.Delta)));
                 m_xmcTft.UpdateSelectedAndNumberOfLocs(
                     m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
-                m_LocSelection   = true;
-                m_SkipRequestCnt = 2;
+                m_xmcTft.UpdateLocInfoSelect(m_LocLib.GetActualLocAddress(), m_LocLib.GetLocName());
+                m_LocSelection = true;
             }
             break;
         case pushedShort:
@@ -492,6 +500,13 @@ class statePowerOff : public xmcApp
             m_XpNet.setPower(csNormal);
             break;
         case pushedlong: transit<stateMainMenu1>(); break;
+        case released:
+            m_XpNet.getLocoInfo(
+                (uint8_t)(m_LocLib.GetActualLocAddress() >> 8), (uint8_t)(m_LocLib.GetActualLocAddress()));
+            m_SkipRequestCnt     = 2;
+            m_PushButtonReleased = true;
+            break;
+
         default: break;
         }
     }
@@ -524,10 +539,11 @@ class statePowerOn : public xmcApp
      */
     void entry() override
     {
-        m_PowerStatus = powerStatus::on;
+        m_LocSelection   = false;
+        m_PowerStatus    = powerStatus::on;
+        m_SkipRequestCnt = 0;
         m_xmcTft.UpdateStatus("POWER ON ", false, WmcTft::color_green);
         m_xmcTft.UpdateSelectedAndNumberOfLocs(m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
-        m_SkipRequestCnt = 0;
     }
 
     /**
@@ -542,8 +558,11 @@ class statePowerOn : public xmcApp
         else
         {
             m_SkipRequestCnt = 2;
-            m_XpNet.getLocoInfo(
-                (uint8_t)(m_LocLib.GetActualLocAddress() >> 8), (uint8_t)(m_LocLib.GetActualLocAddress()));
+            if (m_LocSelection == false)
+            {
+                m_XpNet.getLocoInfo(
+                    (uint8_t)(m_LocLib.GetActualLocAddress() >> 8), (uint8_t)(m_LocLib.GetActualLocAddress()));
+            }
         }
     }
 
@@ -560,9 +579,14 @@ class statePowerOn : public xmcApp
         case powerOff: transit<statePowerOff>(); break;
         case powerStop: transit<statePowerEmergencyStop>(); break;
         case locdata:
-            LocDataPtr = (locData*)(e.Data);
-            memcpy(&m_LocDataReceived, LocDataPtr, sizeof(locData));
-            updateLocInfoOnScreen(false);
+            // Only update when not selecting a loc.
+            if ((m_LocSelection == false) || (m_PushButtonReleased == true))
+            {
+                LocDataPtr = (locData*)(e.Data);
+                memcpy(&m_LocDataReceived, LocDataPtr, sizeof(locData));
+                updateLocInfoOnScreen(false);
+                m_PushButtonReleased = false;
+            }
             break;
         case programmingMode:
             m_PowerStatus = powerStatus::progMode;
@@ -595,13 +619,11 @@ class statePowerOn : public xmcApp
             /* Select next or previous loc. */
             if (CheckPulseSwitchRevert(e.Delta) != 0)
             {
-                m_LocLib.GetNextLoc(CheckPulseSwitchRevert(e.Delta));
-                m_XpNet.getLocoInfo(
-                    (uint8_t)(m_LocLib.GetActualLocAddress() >> 8), (uint8_t)(m_LocLib.GetActualLocAddress()));
+                m_LocLib.GetNextLoc(CheckPulseSwitchRevert(CheckPulseSwitchRevert(e.Delta)));
                 m_xmcTft.UpdateSelectedAndNumberOfLocs(
                     m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
-                m_LocSelection   = true;
-                m_SkipRequestCnt = 2;
+                m_xmcTft.UpdateLocInfoSelect(m_LocLib.GetActualLocAddress(), m_LocLib.GetLocName());
+                m_LocSelection = true;
             }
             break;
         case pushedShort:
@@ -629,6 +651,12 @@ class statePowerOn : public xmcApp
             m_CvPomProgramming            = true;
             m_CvPomProgrammingFromPowerOn = true;
             transit<stateCvProgramming>();
+            break;
+        case released:
+            m_XpNet.getLocoInfo(
+                (uint8_t)(m_LocLib.GetActualLocAddress() >> 8), (uint8_t)(m_LocLib.GetActualLocAddress()));
+            m_SkipRequestCnt     = 2;
+            m_PushButtonReleased = true;
             break;
         default: break;
         }
@@ -1074,6 +1102,7 @@ class stateTurnoutControlPowerOff : public xmcApp
         case pushedShort: break;
         case pushedNormal:
         case pushedlong:
+        case released:
             /* Back to loc control. */
             transit<stateGetLocData>();
             break;
@@ -1122,6 +1151,7 @@ class stateMainMenu1 : public xmcApp
         case pushedShort:
         case pushedNormal:
         case pushedlong:
+        case released:
             m_LocSelection = true;
             transit<stateGetPowerStatus>();
             break;
@@ -1182,6 +1212,7 @@ class stateMainMenu2 : public xmcApp
         case pushedShort:
         case pushedNormal:
         case pushedlong:
+        case released:
             m_LocSelection = true;
             transit<stateGetPowerStatus>();
             break;
