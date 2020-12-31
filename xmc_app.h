@@ -39,6 +39,17 @@ public:
         progMode,
     };
 
+    /**
+     * Turnout direction.
+     */
+    enum turnoutDirection
+    {
+        Forward = 0,
+        ForwardOff,
+        Turn,
+        TurnOff,
+    };
+
     /* default reaction for unhandled events */
     void react(tinyfsm::Event const&){};
 
@@ -79,7 +90,7 @@ protected:
     static WmcTft::locoInfo locInfoActual;
     static WmcTft::locoInfo locInfoPrevious;
     static uint16_t m_TurnOutAddress;
-    static uint8_t m_TurnOutDirection;
+    static turnoutDirection m_TurnOutDirection;
     static uint32_t m_TurnoutOffDelay;
     static bool m_CvPomProgramming;
     static bool m_CvPomProgrammingFromPowerOn;

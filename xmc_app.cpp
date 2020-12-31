@@ -42,25 +42,25 @@ char xmcApp::m_locDbDataName[200][11];
 uint16_t xmcApp::m_locDbDataCnt;
 uint16_t xmcApp::m_locDbDataTransmitCnt;
 uint32_t xmcApp::m_locDbDataTransmitDelay;
-xmcApp::powerStatus xmcApp::m_PowerStatus  = off;
-bool xmcApp::m_LocSelection                = false;
-bool xmcApp::m_PushButtonReleased          = false;
-uint8_t xmcApp::m_XpNetAddress             = 0;
-uint8_t xmcApp::m_ConnectCount             = 0;
-uint8_t xmcApp::m_SkipRequestCnt           = 0;
-uint16_t xmcApp::m_TurnOutAddress          = 1;
-uint8_t xmcApp::m_TurnOutDirection         = 0;
-uint32_t xmcApp::m_TurnoutOffDelay         = 0;
-bool xmcApp::m_CvPomProgrammingFromPowerOn = false;
-bool xmcApp::m_CvPomProgramming            = false;
-bool xmcApp::m_EmergencyStopEnabled        = false;
-uint16_t xmcApp::m_locAddressAdd           = 1;
-uint16_t xmcApp::m_locAddressChange        = 1;
-uint16_t xmcApp::m_LocAddressChangeActive  = 1;
-uint16_t xmcApp::m_locAddressDelete        = 1;
-uint8_t xmcApp::m_locFunctionAdd           = 0;
-uint8_t xmcApp::m_locFunctionChange        = 0;
-bool xmcApp::m_PulseSwitchInvert           = false;
+xmcApp::powerStatus xmcApp::m_PowerStatus           = off;
+bool xmcApp::m_LocSelection                         = false;
+bool xmcApp::m_PushButtonReleased                   = false;
+uint8_t xmcApp::m_XpNetAddress                      = 0;
+uint8_t xmcApp::m_ConnectCount                      = 0;
+uint8_t xmcApp::m_SkipRequestCnt                    = 0;
+uint16_t xmcApp::m_TurnOutAddress                   = 1;
+xmcApp::turnoutDirection xmcApp::m_TurnOutDirection = ForwardOff;
+uint32_t xmcApp::m_TurnoutOffDelay                  = 0;
+bool xmcApp::m_CvPomProgrammingFromPowerOn          = false;
+bool xmcApp::m_CvPomProgramming                     = false;
+bool xmcApp::m_EmergencyStopEnabled                 = false;
+uint16_t xmcApp::m_locAddressAdd                    = 1;
+uint16_t xmcApp::m_locAddressChange                 = 1;
+uint16_t xmcApp::m_LocAddressChangeActive           = 1;
+uint16_t xmcApp::m_locAddressDelete                 = 1;
+uint8_t xmcApp::m_locFunctionAdd                    = 0;
+uint8_t xmcApp::m_locFunctionChange                 = 0;
+bool xmcApp::m_PulseSwitchInvert                    = false;
 
 /***********************************************************************************************************************
   F U N C T I O N S
@@ -363,9 +363,10 @@ class statePowerOff : public xmcApp
      */
     void entry() override
     {
-        m_PowerStatus  = powerStatus::off;
-        m_locDbDataCnt = 0;
-        m_LocSelection = false;
+        m_PowerStatus        = powerStatus::off;
+        m_locDbDataCnt       = 0;
+        m_LocSelection       = false;
+        m_PushButtonReleased = false;
         m_xmcTft.UpdateStatus("POWER OFF", false, WmcTft::color_red);
         m_xmcTft.UpdateSelectedAndNumberOfLocs(m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
 
@@ -413,15 +414,16 @@ class statePowerOff : public xmcApp
 
         case powerStop: break;
         case locdata:
-            // Only update when not selecting a loc.
-            if ((m_LocSelection == false) || (m_PushButtonReleased = false))
+            // Only update when not selecting a loc or when button released after selecting.
+            if ((m_LocSelection == false) || (m_PushButtonReleased = true))
             {
                 LocDataPtr = (locData*)(e.Data);
 
                 /* Roco Multimaus keeps transmitting set speed... Force zero speed. */
                 LocDataPtr->Speed = 0;
                 memcpy(&m_LocDataReceived, LocDataPtr, sizeof(locData));
-                updateLocInfoOnScreen(false);
+                updateLocInfoOnScreen(m_PushButtonReleased);
+                m_PushButtonReleased = false;
             }
             break;
         case programmingMode:
@@ -501,10 +503,10 @@ class statePowerOff : public xmcApp
             break;
         case pushedlong: transit<stateMainMenu1>(); break;
         case released:
-            m_XpNet.getLocoInfo(
-                (uint8_t)(m_LocLib.GetActualLocAddress() >> 8), (uint8_t)(m_LocLib.GetActualLocAddress()));
             m_SkipRequestCnt     = 2;
             m_PushButtonReleased = true;
+            m_XpNet.getLocoInfo(
+                (uint8_t)(m_LocLib.GetActualLocAddress() >> 8), (uint8_t)(m_LocLib.GetActualLocAddress()));
             break;
 
         default: break;
@@ -539,9 +541,10 @@ class statePowerOn : public xmcApp
      */
     void entry() override
     {
-        m_LocSelection   = false;
-        m_PowerStatus    = powerStatus::on;
-        m_SkipRequestCnt = 0;
+        m_LocSelection       = false;
+        m_PowerStatus        = powerStatus::on;
+        m_SkipRequestCnt     = 0;
+        m_PushButtonReleased = false;
         m_xmcTft.UpdateStatus("POWER ON ", false, WmcTft::color_green);
         m_xmcTft.UpdateSelectedAndNumberOfLocs(m_LocLib.GetActualSelectedLocIndex(), m_LocLib.GetNumberOfLocs());
     }
@@ -584,7 +587,7 @@ class statePowerOn : public xmcApp
             {
                 LocDataPtr = (locData*)(e.Data);
                 memcpy(&m_LocDataReceived, LocDataPtr, sizeof(locData));
-                updateLocInfoOnScreen(false);
+                updateLocInfoOnScreen(m_PushButtonReleased);
                 m_PushButtonReleased = false;
             }
             break;
@@ -653,10 +656,10 @@ class statePowerOn : public xmcApp
             transit<stateCvProgramming>();
             break;
         case released:
+            m_PushButtonReleased = true;
+            m_SkipRequestCnt     = 2;
             m_XpNet.getLocoInfo(
                 (uint8_t)(m_LocLib.GetActualLocAddress() >> 8), (uint8_t)(m_LocLib.GetActualLocAddress()));
-            m_SkipRequestCnt     = 2;
-            m_PushButtonReleased = true;
             break;
         default: break;
         }
@@ -885,7 +888,7 @@ class stateTurnoutControl : public xmcApp
      */
     void entry() override
     {
-        m_TurnOutDirection = 0;
+        m_TurnOutDirection = ForwardOff;
 
         m_xmcTft.UpdateStatus("TURNOUT", true, WmcTft::color_green);
         m_xmcTft.ShowTurnoutScreen();
@@ -899,9 +902,9 @@ class stateTurnoutControl : public xmcApp
     void react(updateEvent500msec const&) override
     {
         /* When turnout active sent after 500msec off command. */
-        if (m_TurnOutDirection != 0)
+        if ((m_TurnOutDirection == Forward) || (m_TurnOutDirection == Turn))
         {
-            m_TurnOutDirection = 0;
+            m_TurnOutDirection = ForwardOff;
             m_XpNet.setTrntPos((m_TurnOutAddress - 1) >> 8, (uint8_t)(m_TurnOutAddress - 1), 0x00);
             m_xmcTft.ShowTurnoutDirection(static_cast<uint8_t>(m_TurnOutDirection));
         }
@@ -941,7 +944,7 @@ class stateTurnoutControl : public xmcApp
         case turn:
             if (CheckPulseSwitchRevert(e.Delta) > 0)
             {
-                /* Increase address and check for overrrun. */
+                /* Increase address and check for overrun. */
                 if (m_TurnOutAddress < ADDRESS_TURNOUT_MAX)
                 {
                     m_TurnOutAddress++;
@@ -974,6 +977,7 @@ class stateTurnoutControl : public xmcApp
             break;
         case pushedNormal:
         case pushedlong:
+        case released:
             /* Back to loc control. */
             transit<stateGetPowerStatus>();
             break;
@@ -1005,13 +1009,13 @@ class stateTurnoutControl : public xmcApp
         case button_2: m_TurnOutAddress += 100; break;
         case button_3: m_TurnOutAddress += 1000; break;
         case button_4:
-            m_TurnOutDirection = 1;
+            m_TurnOutDirection = Forward;
             m_TurnoutOffDelay  = millis();
             updateScreen       = false;
             sentTurnOutCommand = true;
             break;
         case button_5:
-            m_TurnOutDirection = 2;
+            m_TurnOutDirection = Turn;
             m_TurnoutOffDelay  = millis();
             updateScreen       = false;
             sentTurnOutCommand = true;
@@ -1032,7 +1036,7 @@ class stateTurnoutControl : public xmcApp
         {
             /* Sent command and show turnout direction. */
             turnoutData = 0x08;
-            if (m_TurnOutDirection == 1)
+            if (m_TurnOutDirection == Forward)
             {
                 turnoutData |= 1;
             }
@@ -1046,9 +1050,9 @@ class stateTurnoutControl : public xmcApp
      */
     void exit() override
     {
-        if (m_TurnOutDirection != 0)
+        if ((m_TurnOutDirection == Forward) || (m_TurnOutDirection == Turn))
         {
-            m_TurnOutDirection = 0;
+            m_TurnOutDirection = ForwardOff;
             m_XpNet.setTrntPos((m_TurnOutAddress - 1) >> 8, (uint8_t)(m_TurnOutAddress - 1), m_TurnOutDirection);
         }
     }
@@ -2035,7 +2039,7 @@ void xmcApp::updateLocInfoOnScreen(bool updateAll)
     {
         m_LocLib.SpeedUpdate(m_LocDataReceived.Speed);
 
-        /* Convert speed. */
+        /* Convert direction. */
         switch (m_LocDataReceived.Direction)
         {
         case 0: m_LocLib.DirectionSet(directionBackWard); break;
@@ -2066,7 +2070,6 @@ void xmcApp::updateLocInfoOnScreen(bool updateAll)
         if (m_LocSelection == true)
         {
             m_LocDataRecievedPrevious.Functions = ~m_LocDataReceived.Functions;
-            m_LocSelection                      = false;
         }
 
         /* Convert data for display. */
@@ -2076,6 +2079,7 @@ void xmcApp::updateLocInfoOnScreen(bool updateAll)
             &locInfoActual, &locInfoPrevious, m_locFunctionAssignment, m_LocLib.GetLocName(), updateAll);
 
         memcpy(&m_LocDataRecievedPrevious, &m_LocDataReceived, sizeof(locData));
+        m_LocSelection = false;
     }
 }
 
