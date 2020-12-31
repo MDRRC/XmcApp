@@ -62,6 +62,10 @@ uint8_t xmcApp::m_locFunctionAdd                    = 0;
 uint8_t xmcApp::m_locFunctionChange                 = 0;
 bool xmcApp::m_PulseSwitchInvert                    = false;
 
+/* Conversion table for 28 steps DCC speed to normal speed. */
+const uint8_t SpeedStep28TableFromDcc[32] = { 0, 0, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 0, 0, 2, 4, 6, 8,
+    10, 12, 14, 16, 18, 20, 22, 24, 26, 28 };
+
 /***********************************************************************************************************************
   F U N C T I O N S
  **********************************************************************************************************************/
@@ -2197,13 +2201,7 @@ void notifyLokAll(uint8_t Adr_High, uint8_t Adr_Low, boolean Busy, uint8_t Steps
     uint8_t F0, uint8_t F1, uint8_t F2, uint8_t F3, boolean Req)
 {
     XpNetEvent Event;
-
-    /* Conversion table for 28 steps DCC speed to normal speed. */
-    const uint8_t SpeedStep28TableFromDcc[32] = { 0, 0, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 0, 0, 2, 4,
-        6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28 };
-
-    Busy = Busy;
-    Req  = Req;
+    Req = Req;
 
     Event.dataType      = locdata;
     locData* LocDataPtr = (locData*)(Event.Data);
@@ -2243,7 +2241,7 @@ void notifyLokAll(uint8_t Adr_High, uint8_t Adr_Low, boolean Busy, uint8_t Steps
         LocDataPtr->Functions |= (uint32_t)(F1) << 5;
         LocDataPtr->Functions |= (uint32_t)(F2) << 13;
         LocDataPtr->Functions |= (uint32_t)(F3) << 21;
-        LocDataPtr->Occupied = false;
+        LocDataPtr->Occupied = Busy;
 
         send_event(Event);
     }
