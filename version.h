@@ -22,8 +22,8 @@
  */
 
 #define SW_MAJOR 2
-#define SW_MINOR 1
-#define SW_PATCH 3
+#define SW_MINOR 2
+#define SW_PATCH 0
 
 /*
  *******************************************************************************************
